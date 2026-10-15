@@ -1,0 +1,806 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Customer and seller account profile and role information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "firstName": { "type": "string", "maxLength": 50 },
+        "lastName": { "type": "string", "maxLength": 50 },
+        "phoneNumber": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["customer", "seller", "affiliate", "admin"] },
+        "storeId": { "type": "string" },
+        "emailVerified": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "SellerProfile": {
+      "title": "SellerProfile",
+      "description": "Public and operational store profile for vetted Nigerian merchants",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "storeName": { "type": "string", "maxLength": 100 },
+        "storeSlug": { "type": "string", "maxLength": 120 },
+        "tagline": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 50 },
+        "logoUrl": { "type": "string" },
+        "bannerUrl": { "type": "string" },
+        "phone": { "type": "string", "maxLength": 25 },
+        "email": { "type": "string", "format": "email" },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "country": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["pending", "active", "suspended", "closed"] },
+        "verified": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "productCount": { "type": "number" },
+        "shipsWithinHours": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "storeName", "storeSlug", "status"]
+    },
+    "SellerApplication": {
+      "title": "SellerApplication",
+      "description": "Application record submitted by merchant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "storeName": { "type": "string" },
+        "businessCategory": { "type": "string" },
+        "description": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "storeName", "status"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Marketplace product created and managed by a verified seller",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 150 },
+        "name": { "type": "string", "maxLength": 150 },
+        "slug": { "type": "string", "maxLength": 180 },
+        "description": { "type": "string", "maxLength": 3000 },
+        "shortDescription": { "type": "string", "maxLength": 300 },
+        "categoryId": { "type": "string" },
+        "category": { "type": "string" },
+        "images": { "type": "array" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "compareAtPrice": { "type": "number" },
+        "sku": { "type": "string", "maxLength": 50 },
+        "stock": { "type": "number" },
+        "stockCount": { "type": "number" },
+        "lowStockThreshold": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "active", "outOfStock", "archived"] },
+        "brand": { "type": "string" },
+        "tags": { "type": "array" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "deliverySpeed": { "type": "string" },
+        "isMadeInNigeria": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "sellerId", "title", "price", "status"]
+    },
+    "Address": {
+      "title": "Address",
+      "description": "Customer saved shipping address in Nigeria",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["id", "street", "city", "state"]
+    },
+    "WishlistItem": {
+      "title": "WishlistItem",
+      "description": "Product saved to customer wishlist",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["productId"]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "description": "Line item stored in customer persistent cart",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" },
+        "selectedVariant": { "type": "string" },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["id", "productId", "sellerId", "quantity", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer multi-vendor order record with escrow protection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "currency": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "pending", "paid", "failed", "refunded"] },
+        "orderStatus": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] },
+        "deliverySpeed": { "type": "string" },
+        "estimatedDelivery": { "type": "string" },
+        "idempotencyKey": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "total", "orderStatus", "paymentStatus"]
+    },
+    "SellerOrder": {
+      "title": "SellerOrder",
+      "description": "Seller-specific portion of a multi-vendor customer order for fulfillment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "storeName": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "deliveryAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "held_in_escrow", "released", "refunded"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "sellerId", "subtotal", "status"]
+    },
+    "OrderItem": {
+      "title": "OrderItem",
+      "description": "Immutable product snapshot at the time of purchase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "sellerOrderId": { "type": "string" },
+        "productId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "productName": { "type": "string" },
+        "productImage": { "type": "string" },
+        "unitPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "sku": { "type": "string" }
+      },
+      "required": ["id", "orderId", "productId", "sellerId", "unitPrice", "quantity", "subtotal"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Secure Paystack payment record with transaction details and escrow reconciliation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "reference": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string", "enum": ["initialized", "pending", "paid", "failed", "abandoned", "refunded"] },
+        "channel": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "paystackTransactionId": { "type": "string" },
+        "gatewayResponse": { "type": "string" },
+        "reconciliationStatus": { "type": "string", "enum": ["matched", "unmatched", "requires_review"] },
+        "customerEmail": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "orderId", "userId", "reference", "amount", "status"]
+    },
+    "PaymentAttempt": {
+      "title": "PaymentAttempt",
+      "description": "Individual payment attempt associated with an order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "reference": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["initialized", "pending", "successful", "failed", "abandoned"] },
+        "channel": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "reference", "amount", "status"]
+    },
+    "SellerEarning": {
+      "title": "SellerEarning",
+      "description": "Seller revenue breakdown and platform commission calculation for fulfilled items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "orderItemIds": { "type": "array" },
+        "grossAmount": { "type": "number" },
+        "platformCommission": { "type": "number" },
+        "platformCommissionRate": { "type": "number" },
+        "paymentProcessingFee": { "type": "number" },
+        "netAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "available", "paid", "reversed"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "sellerId", "orderId", "grossAmount", "netAmount", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Financial and order lifecycle immutable audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "actorId": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "action", "entityType", "entityId", "timestamp"]
+    },
+    "AffiliateProfile": {
+      "title": "AffiliateProfile",
+      "description": "Affiliate marketer profile, unique referral code, and commission metrics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "code": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "suspended"] },
+        "commissionRate": { "type": "number" },
+        "promotionalChannel": { "type": "string" },
+        "channelUrl": { "type": "string" },
+        "audienceDescription": { "type": "string" },
+        "preferredCategories": { "type": "array" },
+        "totalClicks": { "type": "number" },
+        "totalConversions": { "type": "number" },
+        "totalEarnings": { "type": "number" },
+        "pendingEarnings": { "type": "number" },
+        "approvedEarnings": { "type": "number" },
+        "paidEarnings": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "displayName", "code", "status", "commissionRate"]
+    },
+    "AffiliateApplication": {
+      "title": "AffiliateApplication",
+      "description": "Application submission to join the MarketNest affiliate partnership program",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "displayName": { "type": "string" },
+        "channel": { "type": "string" },
+        "channelUrl": { "type": "string" },
+        "audience": { "type": "string" },
+        "reason": { "type": "string" },
+        "preferredCategories": { "type": "array" },
+        "agreedToTerms": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "suspended"] },
+        "submittedAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "fullName", "channel", "status", "agreedToTerms"]
+    },
+    "AffiliateCampaign": {
+      "title": "AffiliateCampaign",
+      "description": "Marketplace seasonal promotion campaigns with bonus affiliate commissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "commissionRate": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "active", "paused", "ended"] },
+        "bannerUrl": { "type": "string" },
+        "startAt": { "type": "string" },
+        "endAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "slug", "commissionRate", "status"]
+    },
+    "AffiliateLink": {
+      "title": "AffiliateLink",
+      "description": "Generated referral link targeting product, store, category, homepage, or campaign",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "code": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["product", "store", "category", "homepage", "campaign"] },
+        "targetId": { "type": "string" },
+        "targetName": { "type": "string" },
+        "targetUrl": { "type": "string" },
+        "url": { "type": "string" },
+        "clicksCount": { "type": "number" },
+        "conversionsCount": { "type": "number" },
+        "earningsAmount": { "type": "number" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "code", "targetType", "targetId", "url"]
+    },
+    "AffiliateClick": {
+      "title": "AffiliateClick",
+      "description": "Anonymized referral visit tracking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "code": { "type": "string" },
+        "linkId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "landingPath": { "type": "string" },
+        "referrer": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "code", "sessionId", "createdAt"]
+    },
+    "AffiliateConversion": {
+      "title": "AffiliateConversion",
+      "description": "Verified qualifying purchase attribution to an affiliate referral",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "code": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "attributionType": { "type": "string", "enum": ["last_click"] },
+        "grossAmount": { "type": "number" },
+        "eligibleAmount": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "attributedAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "code", "orderId", "orderNumber", "commissionAmount"]
+    },
+    "AffiliateCommission": {
+      "title": "AffiliateCommission",
+      "description": "Server-calculated commission earnings record tied to verified paid orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "code": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "grossAmount": { "type": "number" },
+        "eligibleAmount": { "type": "number" },
+        "commissionRate": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "paid", "reversed"] },
+        "reversalReason": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "orderId", "commissionAmount", "status"]
+    },
+    "AffiliatePayout": {
+      "title": "AffiliatePayout",
+      "description": "Affiliate commission disbursement request foundation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string", "enum": ["requested", "processing", "paid", "failed", "cancelled"] },
+        "reference": { "type": "string" },
+        "requestedAt": { "type": "string" },
+        "processedAt": { "type": "string" },
+        "destinationBank": { "type": "string" },
+        "accountNumberMasked": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "amount", "status", "reference"]
+    },
+    "ProductReview": {
+      "title": "ProductReview",
+      "description": "Verified customer review and star rating for marketplace products",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderItemId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "title": { "type": "string", "maxLength": 120 },
+        "comment": { "type": "string", "maxLength": 2000 },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "published", "hidden", "flagged"] },
+        "verifiedPurchase": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "productId", "customerId", "sellerId", "rating", "comment", "status", "verifiedPurchase"]
+    },
+    "ReviewResponse": {
+      "title": "ReviewResponse",
+      "description": "Official merchant response to customer product reviews",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reviewId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "response": { "type": "string", "maxLength": 1500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "reviewId", "sellerId", "response"]
+    },
+    "ProductQuestion": {
+      "title": "ProductQuestion",
+      "description": "Customer inquiry regarding product specifications or sizing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "question": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["published", "pending", "hidden"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "productId", "customerId", "question", "status"]
+    },
+    "ProductAnswer": {
+      "title": "ProductAnswer",
+      "description": "Answer to customer question with seller or admin attribution",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "questionId": { "type": "string" },
+        "answererId": { "type": "string" },
+        "answererType": { "type": "string", "enum": ["seller", "admin", "customer"] },
+        "answer": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "questionId", "answererId", "answererType", "answer"]
+    },
+    "StoreFollower": {
+      "title": "StoreFollower",
+      "description": "Customer following relationship for merchant storefront updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerId", "storeId", "createdAt"]
+    },
+    "CustomerNotification": {
+      "title": "CustomerNotification",
+      "description": "Transactional and operational in-app notifications for customers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "title", "message", "read", "createdAt"]
+    },
+    "ReturnRequest": {
+      "title": "ReturnRequest",
+      "description": "Structured customer return and refund request for delivered orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderItemId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "reason": { "type": "string" },
+        "description": { "type": "string", "maxLength": 1000 },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "status": {
+          "type": "string",
+          "enum": ["requested", "reviewing", "approved", "rejected", "return_in_progress", "received", "refunded", "cancelled"]
+        },
+        "requestedAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "orderItemId", "customerId", "sellerId", "reason", "status", "requestedAt"]
+    },
+    "Promotion": {
+      "title": "Promotion",
+      "description": "Promotional coupon or platform discount rule with validation constraints",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "value": { "type": "number" },
+        "scope": { "type": "string", "enum": ["all", "category", "product", "store"] },
+        "targetIds": { "type": "array", "items": { "type": "string" } },
+        "minimumOrderAmount": { "type": "number" },
+        "usageLimit": { "type": "number" },
+        "perCustomerLimit": { "type": "number" },
+        "startAt": { "type": "string" },
+        "endAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "active", "paused", "expired"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "code", "type", "value", "scope", "status"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Secure customer-seller messaging thread regarding orders or items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "productId": { "type": "string" },
+        "lastMessageAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customerId", "sellerId", "lastMessageAt", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual message inside a customer-seller conversation thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "message": { "type": "string", "maxLength": 2000 },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "senderId", "message", "read", "createdAt"]
+    },
+    "LoyaltyAccount": {
+      "title": "LoyaltyAccount",
+      "description": "Customer marketplace loyalty rewards account and points balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "pointsBalance": { "type": "number" },
+        "lifetimePoints": { "type": "number" },
+        "tier": { "type": "string", "enum": ["bronze", "silver", "gold", "platinum"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "pointsBalance", "tier"]
+    },
+    "LoyaltyTransaction": {
+      "title": "LoyaltyTransaction",
+      "description": "Ledger entry for points earned, redeemed, or reversed on orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["earned", "redeemed", "expired", "adjusted", "reversed"] },
+        "points": { "type": "number" },
+        "orderId": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "points", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with customer or seller role"
+    },
+    "/sellerProfiles/{userId}": {
+      "schema": "SellerProfile",
+      "description": "Public and operational seller store profiles"
+    },
+    "/sellerApplications/{applicationId}": {
+      "schema": "SellerApplication",
+      "description": "Merchant applications submitted for review"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Multi-vendor catalog products created by sellers"
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": "Address",
+      "description": "Customer saved shipping addresses"
+    },
+    "/users/{userId}/wishlist/{productId}": {
+      "schema": "WishlistItem",
+      "description": "Customer saved wishlist items"
+    },
+    "/users/{userId}/cart/{itemId}": {
+      "schema": "CartItem",
+      "description": "Customer persistent cart items synchronized across devices"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer multi-vendor orders with escrow tracking"
+    },
+    "/sellerOrders/{sellerOrderId}": {
+      "schema": "SellerOrder",
+      "description": "Fulfillment orders grouped per independent merchant"
+    },
+    "/orderItems/{orderItemId}": {
+      "schema": "OrderItem",
+      "description": "Immutable line-item product snapshots for historical integrity"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Authoritative payment records verified against Paystack"
+    },
+    "/paymentAttempts/{attemptId}": {
+      "schema": "PaymentAttempt",
+      "description": "Multi-attempt transaction logs"
+    },
+    "/orders/{orderId}/paymentAttempts/{attemptId}": {
+      "schema": "PaymentAttempt",
+      "description": "Payment attempts nested per order"
+    },
+    "/sellerEarnings/{earningId}": {
+      "schema": "SellerEarning",
+      "description": "Verified seller earnings and platform commissions"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Immutable financial audit logs"
+    },
+    "/affiliateProfiles/{userId}": {
+      "schema": "AffiliateProfile",
+      "description": "Affiliate partner profiles, unique codes, and metrics"
+    },
+    "/affiliateApplications/{applicationId}": {
+      "schema": "AffiliateApplication",
+      "description": "Affiliate partner registration applications"
+    },
+    "/affiliateCampaigns/{campaignId}": {
+      "schema": "AffiliateCampaign",
+      "description": "Promotional campaigns with special affiliate commissions"
+    },
+    "/affiliateLinks/{linkId}": {
+      "schema": "AffiliateLink",
+      "description": "Shareable referral links created by affiliates"
+    },
+    "/affiliateClicks/{clickId}": {
+      "schema": "AffiliateClick",
+      "description": "Referral click tracking analytics records"
+    },
+    "/affiliateConversions/{conversionId}": {
+      "schema": "AffiliateConversion",
+      "description": "Attributed purchase conversion records"
+    },
+    "/affiliateCommissions/{commissionId}": {
+      "schema": "AffiliateCommission",
+      "description": "Server-generated commission ledger for verified paid orders"
+    },
+    "/affiliatePayouts/{payoutId}": {
+      "schema": "AffiliatePayout",
+      "description": "Affiliate partner withdrawal and disbursement records"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "ProductReview",
+      "description": "Customer product reviews and star ratings"
+    },
+    "/reviewResponses/{responseId}": {
+      "schema": "ReviewResponse",
+      "description": "Seller replies to customer product reviews"
+    },
+    "/productQuestions/{questionId}": {
+      "schema": "ProductQuestion",
+      "description": "Customer product questions and inquiries"
+    },
+    "/productAnswers/{answerId}": {
+      "schema": "ProductAnswer",
+      "description": "Seller and community answers to product questions"
+    },
+    "/storeFollowers/{followId}": {
+      "schema": "StoreFollower",
+      "description": "Store follower records for brand updates"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "CustomerNotification",
+      "description": "Customer in-app transactional notifications"
+    },
+    "/returns/{returnId}": {
+      "schema": "ReturnRequest",
+      "description": "Customer return and refund claims"
+    },
+    "/promotions/{promotionId}": {
+      "schema": "Promotion",
+      "description": "Marketplace coupon codes and promotional rules"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct communication thread between customer and merchant"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Individual message inside customer-merchant conversation thread"
+    },
+    "/loyaltyAccounts/{userId}": {
+      "schema": "LoyaltyAccount",
+      "description": "Customer marketplace rewards points balance and tier"
+    },
+    "/loyaltyTransactions/{transactionId}": {
+      "schema": "LoyaltyTransaction",
+      "description": "Marketplace reward points ledger records"
+    }
+  }
+}
