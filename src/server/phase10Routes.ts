@@ -31,9 +31,14 @@ import {
   SellerGrowthInsight,
   FunnelStageMetric
 } from '../types';
-import { MOCK_PRODUCTS, MOCK_STORES } from '../data/mockData';
+import { ensureServerAuth } from './serverAuth';
 
 export const phase10Router = Router();
+
+phase10Router.use(async (_req, _res, next) => {
+  await ensureServerAuth();
+  next();
+});
 
 // ======================================================================
 // 1. REAL SERVER-DERIVED MARKETPLACE OPERATIONS METRICS
@@ -85,7 +90,7 @@ phase10Router.get('/operations/metrics', async (req: Request, res: Response) => 
       const spSnap = await getDocs(collection(db, 'sellerProfiles'));
       sellerProfilesCount = spSnap.size;
     } catch {
-      sellerProfilesCount = MOCK_STORES.length;
+      sellerProfilesCount = 0;
     }
 
     try {
@@ -93,7 +98,7 @@ phase10Router.get('/operations/metrics', async (req: Request, res: Response) => 
       const appSnap = await getDocs(qApps);
       pendingSellerAppsCount = appSnap.size;
     } catch {
-      pendingSellerAppsCount = 3;
+      pendingSellerAppsCount = 0;
     }
 
     // C. Query Affiliates
@@ -103,7 +108,7 @@ phase10Router.get('/operations/metrics', async (req: Request, res: Response) => 
       const affSnap = await getDocs(qAff);
       pendingAffiliateAppsCount = affSnap.size;
     } catch {
-      pendingAffiliateAppsCount = 2;
+      pendingAffiliateAppsCount = 0;
     }
 
     // D. Query Returns & Refunds
@@ -130,11 +135,9 @@ phase10Router.get('/operations/metrics', async (req: Request, res: Response) => 
           const stock = p.stockCount !== undefined ? p.stockCount : p.stock || 0;
           if (stock <= 5) lowStockCount++;
         });
-      } else {
-        lowStockCount = MOCK_PRODUCTS.filter((p) => (p.stock || 0) <= 5).length;
       }
     } catch {
-      lowStockCount = MOCK_PRODUCTS.filter((p) => (p.stock || 0) <= 5).length;
+      lowStockCount = 0;
     }
 
     // F. Query Open Support Tickets
@@ -144,30 +147,30 @@ phase10Router.get('/operations/metrics', async (req: Request, res: Response) => 
       const tSnap = await getDocs(qTickets);
       openTicketsCount = tSnap.size;
     } catch {
-      openTicketsCount = 4;
+      openTicketsCount = 0;
     }
 
     const metrics: MarketplaceOperationsMetrics = {
-      gmv: gmv || 12450000,
-      completedOrdersCount: completedCount || 42,
-      netMarketplaceRevenue: netRevenue || 996000,
-      averageOrderValue: aov || 296428,
-      activeCustomersCount: Math.max(activeCustomerIds.size, 38),
-      activeSellersCount: Math.max(sellerProfilesCount, MOCK_STORES.length),
-      newCustomersCount: 16,
-      newSellersCount: 4,
-      pendingSellerApplicationsCount: pendingSellerAppsCount || 3,
-      pendingAffiliateApplicationsCount: pendingAffiliateAppsCount || 2,
-      unfulfilledOrdersCount: unfulfilledOrders.length || 5,
-      ordersAwaitingShipmentCount: ordersAwaitingShipment.length || 3,
-      pendingReturnsCount: pendingReturnsCount || 2,
-      paymentFailuresCount: 1,
-      refundsAwaitingActionCount: refundsAwaitingCount || 1,
-      lowStockProductsCount: lowStockCount || 6,
+      gmv,
+      completedOrdersCount: completedCount,
+      netMarketplaceRevenue: netRevenue,
+      averageOrderValue: aov,
+      activeCustomersCount: activeCustomerIds.size,
+      activeSellersCount: sellerProfilesCount,
+      newCustomersCount: activeCustomerIds.size,
+      newSellersCount: sellerProfilesCount,
+      pendingSellerApplicationsCount: pendingSellerAppsCount,
+      pendingAffiliateApplicationsCount: pendingAffiliateAppsCount,
+      unfulfilledOrdersCount: unfulfilledOrders.length,
+      ordersAwaitingShipmentCount: ordersAwaitingShipment.length,
+      pendingReturnsCount,
+      paymentFailuresCount: 0,
+      refundsAwaitingActionCount: refundsAwaitingCount,
+      lowStockProductsCount: lowStockCount,
       openSupportTicketsCount: openTicketsCount,
-      totalAffiliateCommissions: Math.round(gmv * 0.05) || 622500,
-      totalSellerEarnings: Math.round(gmv * 0.92) || 11454000,
-      totalRefundsAmount: totalRefundsAmount || 145000
+      totalAffiliateCommissions: Math.round(gmv * 0.05),
+      totalSellerEarnings: Math.round(gmv * 0.92),
+      totalRefundsAmount
     };
 
     res.json({
@@ -562,7 +565,7 @@ phase10Router.get('/seller/growth-insights/:sellerId', async (req: Request, res:
     const { sellerId } = req.params;
 
     // Analyze seller's products
-    let sellerProducts = MOCK_PRODUCTS.filter((p) => p.sellerId === sellerId);
+    let sellerProducts: any[] = [];
     try {
       const snap = await getDocs(query(collection(db, 'products'), where('sellerId', '==', sellerId)));
       if (!snap.empty) {

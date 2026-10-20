@@ -18,7 +18,6 @@ import {
 import { db } from './firebase';
 import { handleFirestoreError, OperationType } from './firestoreErrors';
 import { Order, OrderStatus, Product, SellerApplication, SellerProfile } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
 
 // Helper to sanitize and create URL-safe store slugs
 export const slugify = (text: string): string => {
@@ -127,7 +126,21 @@ export const getSellerProducts = async (sellerId: string): Promise<Product[]> =>
     const snap = await getDocs(q);
     const products: Product[] = [];
     snap.forEach((doc) => {
-      products.push({ id: doc.id, ...(doc.data() as Omit<Product, 'id'>) });
+      const raw = doc.data() as any;
+      const normalizedImages: string[] =
+        Array.isArray(raw.images) && raw.images.length > 0
+          ? raw.images
+          : raw.imageUrl
+          ? [raw.imageUrl]
+          : [];
+      const primaryImage = normalizedImages[0] || raw.imageUrl || '';
+
+      products.push({
+        ...raw,
+        id: doc.id,
+        images: normalizedImages,
+        imageUrl: primaryImage
+      } as Product);
     });
     return products;
   } catch (error) {
@@ -146,17 +159,25 @@ export const getStorefrontProducts = async (sellerId: string): Promise<Product[]
     const snap = await getDocs(q);
     const products: Product[] = [];
     snap.forEach((doc) => {
-      const data = doc.data() as Product;
+      const raw = doc.data() as any;
       // Filter out archived products from storefront
-      if (data.status !== 'archived') {
-        products.push({ ...data, id: doc.id });
+      if (raw.status !== 'archived') {
+        const normalizedImages: string[] =
+          Array.isArray(raw.images) && raw.images.length > 0
+            ? raw.images
+            : raw.imageUrl
+            ? [raw.imageUrl]
+            : [];
+        const primaryImage = normalizedImages[0] || raw.imageUrl || '';
+
+        products.push({
+          ...raw,
+          id: doc.id,
+          images: normalizedImages,
+          imageUrl: primaryImage
+        } as Product);
       }
     });
-
-    // If no cloud products yet, fallback to relevant mock products for initial demo
-    if (products.length === 0) {
-      return MOCK_PRODUCTS.slice(0, 4);
-    }
 
     return products;
   } catch (error) {
@@ -167,8 +188,10 @@ export const getStorefrontProducts = async (sellerId: string): Promise<Product[]
 export const saveProduct = async (product: Product): Promise<void> => {
   const path = `products/${product.id}`;
   try {
+    const primaryImage = product.images?.[0] || product.imageUrl || '';
     await setDoc(doc(db, 'products', product.id), {
       ...product,
+      imageUrl: primaryImage, // Maintain backward compatibility
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -179,10 +202,14 @@ export const saveProduct = async (product: Product): Promise<void> => {
 export const updateProduct = async (productId: string, data: Partial<Product>): Promise<void> => {
   const path = `products/${productId}`;
   try {
-    await updateDoc(doc(db, 'products', productId), {
+    const payload: any = {
       ...data,
       updatedAt: new Date().toISOString()
-    });
+    };
+    if (data.images && data.images.length > 0) {
+      payload.imageUrl = data.images[0];
+    }
+    await updateDoc(doc(db, 'products', productId), payload);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }

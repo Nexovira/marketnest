@@ -1,12 +1,6 @@
-/**
- * @file src/pages/admin/components/AdminSearchModal.tsx
- * Omnisearch modal for MarketNest Administrators.
- * Enables rapid indexed search across orders, merchants, products, and customers.
- */
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdmin } from '../../../context/AdminContext';
-import { MOCK_PRODUCTS, MOCK_STORES } from '../../../data/mockData';
+import { adminService } from '../../../services/admin/adminService';
 import { formatCurrency } from '../../../services/currencyService';
 import {
   Search,
@@ -33,6 +27,8 @@ interface SearchResult {
 export const AdminSearchModal: React.FC = () => {
   const { isSearchOpen, setIsSearchOpen, setActiveSection } = useAdmin();
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,6 +36,7 @@ export const AdminSearchModal: React.FC = () => {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setQuery('');
+      setResults([]);
     }
   }, [isSearchOpen]);
 
@@ -57,100 +54,101 @@ export const AdminSearchModal: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSearchOpen, setIsSearchOpen]);
 
+  // Debounced search over genuine database entities
+  useEffect(() => {
+    const cleanQ = query.trim().toLowerCase();
+    if (cleanQ.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    let active = true;
+
+    const timer = setTimeout(async () => {
+      const found: SearchResult[] = [];
+      try {
+        const [ordersRes, prodsRes, sellersRes, custsRes] = await Promise.allSettled([
+          adminService.getOrders(cleanQ),
+          adminService.getProducts(cleanQ),
+          adminService.getSellers(cleanQ),
+          adminService.getCustomers(cleanQ)
+        ]);
+
+        if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value)) {
+          ordersRes.value.slice(0, 4).forEach((o: any) => {
+            found.push({
+              id: o.id || o.orderNumber,
+              type: 'order',
+              title: `Order #${o.orderNumber || o.id}`,
+              subtitle: `Customer: ${o.customerName || o.shippingAddress?.fullName || 'Buyer'} · ${formatCurrency(o.total || 0)}`,
+              badge: o.paymentStatus || 'Pending',
+              badgeColor: o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800',
+              targetSection: 'orders'
+            });
+          });
+        }
+
+        if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value)) {
+          prodsRes.value.slice(0, 4).forEach((p: any) => {
+            found.push({
+              id: p.id,
+              type: 'product',
+              title: p.title || p.name,
+              subtitle: `${p.sellerName || 'Merchant'} · ${formatCurrency(p.price || 0)} · Stock: ${p.stockCount ?? p.stock ?? 0}`,
+              badge: p.category || 'Product',
+              badgeColor: 'bg-neutral-100 text-neutral-800',
+              targetSection: 'products'
+            });
+          });
+        }
+
+        if (sellersRes.status === 'fulfilled' && Array.isArray(sellersRes.value)) {
+          sellersRes.value.slice(0, 3).forEach((s: any) => {
+            found.push({
+              id: s.id,
+              type: 'seller',
+              title: s.storeName || s.name || 'Merchant',
+              subtitle: `Merchant in ${s.city || 'Lagos'} · ${s.email || ''}`,
+              badge: s.verified ? 'Verified Store' : 'Active',
+              badgeColor: 'bg-emerald-100 text-emerald-800',
+              targetSection: 'sellers'
+            });
+          });
+        }
+
+        if (custsRes.status === 'fulfilled' && Array.isArray(custsRes.value)) {
+          custsRes.value.slice(0, 3).forEach((c: any) => {
+            found.push({
+              id: c.id,
+              type: 'customer',
+              title: c.name || c.displayName || 'Customer',
+              subtitle: `${c.email || 'Registered Buyer'}`,
+              badge: 'Customer',
+              badgeColor: 'bg-purple-100 text-purple-800',
+              targetSection: 'customers'
+            });
+          });
+        }
+
+        if (active) {
+          setResults(found);
+          setSearching(false);
+        }
+      } catch {
+        if (active) setSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
   if (!isSearchOpen) return null;
 
-  // Search Results
-  const results: SearchResult[] = [];
-  const cleanQ = query.trim().toLowerCase();
-
-  if (cleanQ.length > 1) {
-    // 1. Match Orders
-    if ('mn-ord-20261006-8f92kd'.includes(cleanQ) || 'nneka'.includes(cleanQ)) {
-      results.push({
-        id: 'MN-ORD-20261006-8F92KD',
-        type: 'order',
-        title: 'Order #MN-ORD-20261006-8F92KD',
-        subtitle: 'Customer: Nneka Okonjo · ₦125,000 · Paid via Card',
-        badge: 'Paid',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        targetSection: 'orders'
-      });
-    }
-    if ('mn-ord-20261006-7h21xp'.includes(cleanQ) || 'tunde'.includes(cleanQ)) {
-      results.push({
-        id: 'MN-ORD-20261006-7H21XP',
-        type: 'order',
-        title: 'Order #MN-ORD-20261006-7H21XP',
-        subtitle: 'Customer: Tunde Adeleke · ₦84,000 · Processing',
-        badge: 'Processing',
-        badgeColor: 'bg-blue-100 text-blue-800',
-        targetSection: 'orders'
-      });
-    }
-
-    // 2. Match Sellers
-    MOCK_STORES.forEach((s) => {
-      if (s.name.toLowerCase().includes(cleanQ) || s.city.toLowerCase().includes(cleanQ)) {
-        results.push({
-          id: s.id,
-          type: 'seller',
-          title: s.name,
-          subtitle: `Merchant in ${s.city}, Lagos · ${s.productCount} active products`,
-          badge: s.verified ? 'Verified Store' : 'Active',
-          badgeColor: 'bg-emerald-100 text-emerald-800',
-          targetSection: 'sellers'
-        });
-      }
-    });
-
-    // 3. Match Products
-    MOCK_PRODUCTS.forEach((p) => {
-      if (p.title.toLowerCase().includes(cleanQ) || p.category.toLowerCase().includes(cleanQ)) {
-        results.push({
-          id: p.id,
-          type: 'product',
-          title: p.title,
-          subtitle: `${p.seller?.name || 'Merchant'} · ${formatCurrency(p.price)} · Stock: ${p.stockCount || 10}`,
-          badge: p.category,
-          badgeColor: 'bg-neutral-100 text-neutral-800',
-          targetSection: 'products'
-        });
-      }
-    });
-
-    // 4. Match Customers
-    const sampleCustomers = [
-      { id: 'user_01', name: 'Nneka Okonjo', email: 'nneka.okonjo@gmail.com', spend: '₦1.25M' },
-      { id: 'user_02', name: 'Tunde Adeleke', email: 'tunde.adeleke@yahoo.com', spend: '₦740k' },
-      { id: 'user_03', name: 'Chiamaka Eze', email: 'chiamaka.eze@outlook.com', spend: '₦2.45M' }
-    ];
-    sampleCustomers.forEach((c) => {
-      if (c.name.toLowerCase().includes(cleanQ) || c.email.toLowerCase().includes(cleanQ)) {
-        results.push({
-          id: c.id,
-          type: 'customer',
-          title: c.name,
-          subtitle: `${c.email} · Lifetime Spend: ${c.spend}`,
-          badge: 'Customer',
-          badgeColor: 'bg-purple-100 text-purple-800',
-          targetSection: 'customers'
-        });
-      }
-    });
-
-    // 5. Match Affiliates
-    if ('mnamina'.includes(cleanQ) || 'amina'.includes(cleanQ)) {
-      results.push({
-        id: 'aff_01',
-        type: 'affiliate',
-        title: 'Amina Style Edit (MNAMINA)',
-        subtitle: '84 Conversions · ₦385,000 Total Earnings',
-        badge: 'Partner',
-        badgeColor: 'bg-purple-100 text-purple-800',
-        targetSection: 'affiliates'
-      });
-    }
-  }
 
   const handleSelectResult = (res: SearchResult) => {
     setActiveSection(res.targetSection);

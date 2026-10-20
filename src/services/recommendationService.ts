@@ -4,7 +4,6 @@
  */
 
 import { Product } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
 
 const RECENTLY_VIEWED_KEY = 'marketnest_recently_viewed_ids';
 
@@ -26,7 +25,7 @@ export const recommendationService = {
   /**
    * Get recently viewed product objects
    */
-  getRecentlyViewedProducts(allProducts: Product[] = MOCK_PRODUCTS): Product[] {
+  getRecentlyViewedProducts(allProducts: Product[] = []): Product[] {
     try {
       const stored = localStorage.getItem(RECENTLY_VIEWED_KEY);
       const ids: string[] = stored ? JSON.parse(stored) : [];
@@ -50,7 +49,7 @@ export const recommendationService = {
   /**
    * "You May Also Like" - Products in same department or related tags
    */
-  getYouMayAlsoLike(targetProduct: Product, allProducts: Product[] = MOCK_PRODUCTS, count = 4): Product[] {
+  getYouMayAlsoLike(targetProduct: Product, allProducts: Product[] = [], count = 4): Product[] {
     return allProducts
       .filter((p) => p.id !== targetProduct.id && p.category === targetProduct.category)
       .slice(0, count);
@@ -59,7 +58,7 @@ export const recommendationService = {
   /**
    * "Similar Products" - Same department with close price range (+-35%)
    */
-  getSimilarProducts(targetProduct: Product, allProducts: Product[] = MOCK_PRODUCTS, count = 4): Product[] {
+  getSimilarProducts(targetProduct: Product, allProducts: Product[] = [], count = 4): Product[] {
     const minP = targetProduct.price * 0.65;
     const maxP = targetProduct.price * 1.35;
     const matching = allProducts.filter(
@@ -75,7 +74,7 @@ export const recommendationService = {
   /**
    * "Frequently Bought Together" - Complementary products from other departments
    */
-  getFrequentlyBoughtTogether(targetProduct: Product, allProducts: Product[] = MOCK_PRODUCTS): Product[] {
+  getFrequentlyBoughtTogether(targetProduct: Product, allProducts: Product[] = []): Product[] {
     // Pick 1-2 complementary accessories from another department
     const complements = allProducts.filter((p) => p.id !== targetProduct.id && p.category !== targetProduct.category);
     return complements.slice(0, 2);
@@ -84,7 +83,7 @@ export const recommendationService = {
   /**
    * "From This Seller" - Other catalog items by the same merchant
    */
-  getFromThisSeller(sellerId: string, currentProductId: string, allProducts: Product[] = MOCK_PRODUCTS, count = 4): Product[] {
+  getFromThisSeller(sellerId: string, currentProductId: string, allProducts: Product[] = [], count = 4): Product[] {
     return allProducts
       .filter((p) => p.sellerId === sellerId && p.id !== currentProductId && (p.stock || p.stockCount || 0) > 0)
       .slice(0, count);
@@ -93,7 +92,7 @@ export const recommendationService = {
   /**
    * Wishlist-Related Recommendations
    */
-  getWishlistRelated(wishlistProductIds: string[], allProducts: Product[] = MOCK_PRODUCTS, count = 4): Product[] {
+  getWishlistRelated(wishlistProductIds: string[], allProducts: Product[] = [], count = 4): Product[] {
     if (!wishlistProductIds || wishlistProductIds.length === 0) return [];
     const wishlistItems = allProducts.filter((p) => wishlistProductIds.includes(p.id));
     const categories = new Set(wishlistItems.map((p) => p.category));
@@ -112,7 +111,7 @@ export const recommendationService = {
     allProducts?: Product[];
     count?: number;
   }): { product: Product; reason: string }[] {
-    const { viewedIds = [], wishlistIds = [], allProducts = MOCK_PRODUCTS, count = 6 } = options;
+    const { viewedIds = [], wishlistIds = [], allProducts = [], count = 6 } = options;
     const results: { product: Product; reason: string }[] = [];
     const seenIds = new Set<string>();
 

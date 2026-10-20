@@ -4,9 +4,10 @@
  * Includes attributes, ratings, merchant credentials, pricing, and fast add-to-bag.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMarket } from '../context/MarketContext';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { productService } from '../services/productService';
+import { Product } from '../types';
 import { Button } from '../components/ui/Button';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { formatCurrency } from '../utils/money';
@@ -33,9 +34,34 @@ export const ComparePage: React.FC = () => {
     setIsCartOpen
   } = useMarket();
 
-  const comparedProducts = compareProductIds
-    .map((id) => MOCK_PRODUCTS.find((p) => p.id === id))
-    .filter(Boolean);
+  const [comparedProducts, setComparedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    if (compareProductIds.length === 0) {
+      setComparedProducts([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    Promise.all(compareProductIds.map((id) => productService.getProductById(id)))
+      .then((results) => {
+        if (active) {
+          setComparedProducts(results.filter((p): p is Product => p !== null));
+        }
+      })
+      .catch((err) => {
+        console.warn('Error loading compared products:', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [compareProductIds]);
 
   const handleBuy = (product: any) => {
     addToCart(product, 1);

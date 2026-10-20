@@ -23,11 +23,16 @@ import {
   CategoryId,
   Product
 } from '../types';
-import { MOCK_PRODUCTS, MOCK_STORES } from '../data/mockData';
 import { db } from '../lib/firebase';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { ensureServerAuth } from './serverAuth';
 
 export const phase11Router = Router();
+
+phase11Router.use(async (_req, _res, next) => {
+  await ensureServerAuth();
+  next();
+});
 
 // ----------------------------------------------------------------------
 // AI Client Initialization & Safe Secret Handling
@@ -339,13 +344,12 @@ phase11Router.post('/ai/shopping/query', async (req: Request, res: Response) => 
 
     const q = (userQuery as string).toLowerCase();
 
-    // Query available products from Firestore and in-memory MOCK_PRODUCTS
-    let allProducts: Product[] = [...MOCK_PRODUCTS];
+    // Query available products exclusively from Firestore
+    let allProducts: Product[] = [];
     try {
       const snap = await getDocs(collection(db, 'products'));
       if (!snap.empty) {
-        const firestoreList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-        allProducts = [...firestoreList, ...allProducts];
+        allProducts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
       }
     } catch {}
 
@@ -524,7 +528,7 @@ phase11Router.get('/ai/seller/insights/:sellerId', async (req: Request, res: Res
     const { sellerId } = req.params;
 
     // Retrieve seller's live catalog
-    let sellerProducts = MOCK_PRODUCTS.filter((p) => p.sellerId === sellerId);
+    let sellerProducts: any[] = [];
     try {
       const snap = await getDocs(query(collection(db, 'products'), where('sellerId', '==', sellerId)));
       if (!snap.empty) {

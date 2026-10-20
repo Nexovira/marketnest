@@ -4,22 +4,39 @@
  * with thumbnails and a direct CTA to /compare.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMarket } from '../context/MarketContext';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { productService } from '../services/productService';
+import { Product } from '../types';
 import { Layers, X, ArrowRight, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../utils/money';
 
 export const CompareTray: React.FC = () => {
   const { compareProductIds, removeFromCompare, clearCompare, navigateTo, activePage } = useMarket();
+  const [comparedProducts, setComparedProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (compareProductIds.length === 0) {
+      setComparedProducts([]);
+      return;
+    }
+    Promise.all(compareProductIds.map((id) => productService.getProductById(id)))
+      .then((results) => {
+        if (active) {
+          setComparedProducts(results.filter((p): p is Product => p !== null));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [compareProductIds]);
 
   if (compareProductIds.length === 0 || activePage === 'compare') {
     return null;
   }
-
-  const comparedProducts = compareProductIds
-    .map((id) => MOCK_PRODUCTS.find((p) => p.id === id))
-    .filter(Boolean);
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4 animate-in slide-in-from-bottom duration-300">

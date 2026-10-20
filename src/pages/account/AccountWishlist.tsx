@@ -3,17 +3,53 @@
  * Customer saved items view linked with Firestore and instant shopping actions.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMarket } from '../../context/MarketContext';
-import { MOCK_PRODUCTS } from '../../data/mockData';
+import { productService } from '../../services/productService';
+import { Product } from '../../types';
 import { ProductCard } from '../../components/ProductCard';
 import { Button } from '../../components/ui/Button';
 import { Heart } from 'lucide-react';
 
 export const AccountWishlist: React.FC = () => {
   const { wishlistIds, navigateTo } = useMarket();
+  const [savedProducts, setSavedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const savedProducts = MOCK_PRODUCTS.filter((p) => wishlistIds.includes(p.id));
+  useEffect(() => {
+    let active = true;
+    if (!wishlistIds || wishlistIds.length === 0) {
+      setSavedProducts([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    productService.getPublicProducts()
+      .then((all) => {
+        if (active) {
+          setSavedProducts(all.filter((p) => wishlistIds.includes(p.id)));
+        }
+      })
+      .catch((err) => {
+        console.warn('Error loading wishlist products:', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [wishlistIds]);
+
+  if (loading) {
+    return (
+      <div className="py-20 text-center space-y-2">
+        <div className="w-8 h-8 border-2 border-[#101413] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-xs text-[#6B726E]">Loading your saved items...</p>
+      </div>
+    );
+  }
 
   if (savedProducts.length === 0) {
     return (

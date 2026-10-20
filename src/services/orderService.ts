@@ -31,7 +31,6 @@ import {
   SellerOrderGroup
 } from '../types';
 import { calculateDelivery } from './deliveryService';
-import { MOCK_PRODUCTS } from '../data/mockData';
 
 export interface CreateOrderParams {
   customerId: string;
@@ -98,15 +97,7 @@ export const validateCartItems = async (
       // Fallback below
     }
 
-    // 2. If not found in Firestore, check mock catalog (for seeded items)
-    if (!liveProduct) {
-      const foundInMock = MOCK_PRODUCTS.find((p) => p.id === item.productId);
-      if (foundInMock) {
-        liveProduct = foundInMock;
-      }
-    }
-
-    // If item could not be found anywhere
+    // If item could not be found in active catalog
     if (!liveProduct) {
       issues.push({
         productId: item.productId,

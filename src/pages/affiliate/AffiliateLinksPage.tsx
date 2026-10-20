@@ -14,12 +14,14 @@ import {
   toggleAffiliateLinkStatus,
   getActiveAffiliateCampaigns
 } from '../../services/affiliate/affiliateService';
-import { MOCK_PRODUCTS, MOCK_STORES } from '../../data/mockData';
+import { productService } from '../../services/productService';
 import {
   AffiliateProfile,
   AffiliateLink,
   AffiliateLinkTargetType,
-  AffiliateCampaign
+  AffiliateCampaign,
+  Product,
+  Store as StoreType
 } from '../../types';
 import { formatCurrency } from '../../services/currencyService';
 import { AffiliateNav } from './AffiliateNav';
@@ -58,12 +60,14 @@ export const AffiliateLinksPage: React.FC = () => {
   const [profile, setProfile] = useState<AffiliateProfile | null>(null);
   const [links, setLinks] = useState<AffiliateLink[]>([]);
   const [campaigns, setCampaigns] = useState<AffiliateCampaign[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [availableStores, setAvailableStores] = useState<StoreType[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Link Generator Modal / Drawer State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [targetType, setTargetType] = useState<AffiliateLinkTargetType>('product');
-  const [selectedTargetId, setSelectedTargetId] = useState<string>(MOCK_PRODUCTS[0]?.id || '');
+  const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [customName, setCustomName] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -71,6 +75,20 @@ export const AffiliateLinksPage: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    Promise.all([
+      productService.getPublicProducts(),
+      productService.getStores()
+    ]).then(([prods, stores]) => {
+      if (active) {
+        setAvailableProducts(prods);
+        setAvailableStores(stores);
+        if (prods.length > 0 && !selectedTargetId) {
+          setSelectedTargetId(prods[0].id);
+        }
+      }
+    }).catch(() => {});
+
     if (!firebaseUser) {
       setLoading(false);
       return;
@@ -83,17 +101,22 @@ export const AffiliateLinksPage: React.FC = () => {
           getAffiliateLinks(firebaseUser.uid),
           getActiveAffiliateCampaigns()
         ]);
-        setProfile(prof);
-        setLinks(userLinks);
-        setCampaigns(camps);
+        if (active) {
+          setProfile(prof);
+          setLinks(userLinks);
+          setCampaigns(camps);
+        }
       } catch (err) {
         console.warn('Error loading links:', err);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadAll();
+    return () => {
+      active = false;
+    };
   }, [firebaseUser]);
 
   const handleCopy = (link: AffiliateLink) => {
@@ -127,11 +150,11 @@ export const AffiliateLinksPage: React.FC = () => {
       let campaignId: string | undefined = undefined;
 
       if (targetType === 'product') {
-        const p = MOCK_PRODUCTS.find((prod) => prod.id === selectedTargetId);
+        const p = availableProducts.find((prod) => prod.id === selectedTargetId);
         targetName = targetName || p?.title || p?.name || 'Product Referral';
         targetUrl = `/product/${selectedTargetId}`;
       } else if (targetType === 'store') {
-        const s = MOCK_STORES.find((st) => st.id === selectedTargetId);
+        const s = availableStores.find((st) => st.id === selectedTargetId);
         targetName = targetName || s?.name || 'Storefront Referral';
         targetUrl = `/stores/${selectedTargetId}`;
       } else if (targetType === 'category') {
@@ -361,8 +384,8 @@ export const AffiliateLinksPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setTargetType(t.id);
-                        if (t.id === 'product') setSelectedTargetId(MOCK_PRODUCTS[0]?.id || '');
-                        if (t.id === 'store') setSelectedTargetId(MOCK_STORES[0]?.id || '');
+                        if (t.id === 'product') setSelectedTargetId(availableProducts[0]?.id || '');
+                        if (t.id === 'store') setSelectedTargetId(availableStores[0]?.id || '');
                         if (t.id === 'category') setSelectedTargetId(CATEGORY_CHOICES[0]?.id || '');
                         if (t.id === 'campaign') setSelectedTargetId(campaigns[0]?.id || '');
                       }}
@@ -387,11 +410,15 @@ export const AffiliateLinksPage: React.FC = () => {
                     onChange={(e) => setSelectedTargetId(e.target.value)}
                     className="w-full bg-[#F7F5F0] border border-[#E4E7E5] rounded-lg p-2.5 text-xs text-[#101413] focus:outline-none focus:border-[#0E8F5A] cursor-pointer"
                   >
-                    {MOCK_PRODUCTS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title || p.name} — {formatCurrency(p.price)}
-                      </option>
-                    ))}
+                    {availableProducts.length === 0 ? (
+                      <option value="">No published products available</option>
+                    ) : (
+                      availableProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title || p.name} — {formatCurrency(p.price)}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               )}
@@ -404,11 +431,15 @@ export const AffiliateLinksPage: React.FC = () => {
                     onChange={(e) => setSelectedTargetId(e.target.value)}
                     className="w-full bg-[#F7F5F0] border border-[#E4E7E5] rounded-lg p-2.5 text-xs text-[#101413] focus:outline-none focus:border-[#0E8F5A] cursor-pointer"
                   >
-                    {MOCK_STORES.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.city}, {s.state})
-                      </option>
-                    ))}
+                    {availableStores.length === 0 ? (
+                      <option value="">No merchant stores available</option>
+                    ) : (
+                      availableStores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.city}, {s.state})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               )}

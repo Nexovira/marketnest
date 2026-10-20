@@ -4,10 +4,10 @@
  * Generates audit-ready reports across Sales, Sellers, Product Stocks, Customers, and Affiliates.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { formatCurrency } from '../../services/currencyService';
-import { MOCK_PRODUCTS, MOCK_STORES } from '../../data/mockData';
+import { adminService } from '../../services/admin/adminService';
 import { Button } from '../../components/ui/Button';
 import {
   FileText,
@@ -27,6 +27,27 @@ export const AdminReportsPage: React.FC = () => {
   const [reportType, setReportType] = useState<'sales' | 'sellers' | 'inventory' | 'customers' | 'affiliates'>('sales');
   const [timeWindow, setTimeWindow] = useState('30d');
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  const [sellers, setSellers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      adminService.getSellers().catch(() => []),
+      adminService.getProducts().catch(() => [])
+    ]).then(([sList, pList]) => {
+      if (active) {
+        setSellers(sList || []);
+        setProducts(pList || []);
+        setLoadingData(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleExportCSV = (filename: string) => {
     setExportNotice(`Exported ${filename}_${timeWindow}.csv to your device downloads.`);
@@ -146,76 +167,92 @@ export const AdminReportsPage: React.FC = () => {
 
       {reportType === 'sellers' && (
         <div className="bg-white border border-[#E4E7E5] rounded-xl overflow-hidden shadow-2xs">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#FBFBFA] border-b border-[#E4E7E5] text-[#6B726E] font-semibold uppercase text-[10px] tracking-wider">
-              <tr>
-                <th className="py-3 px-4">Merchant Store</th>
-                <th className="py-3 px-4">Location</th>
-                <th className="py-3 px-4 text-center">Fulfillments</th>
-                <th className="py-3 px-4">Gross Sales</th>
-                <th className="py-3 px-4">Platform Fee</th>
-                <th className="py-3 px-4">Rating</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E4E7E5]">
-              {MOCK_STORES.map((s) => (
-                <tr key={s.id} className="hover:bg-[#FBFBFA]">
-                  <td className="py-3.5 px-4 font-bold text-[#101413]">{s.name}</td>
-                  <td className="py-3.5 px-4 text-[#6B726E]">{s.city}, Lagos</td>
-                  <td className="py-3.5 px-4 text-center font-mono font-bold">{Math.round(s.productCount * 1.8)}</td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-[#101413]">
-                    {formatCurrency(s.productCount * 145000)}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-[#0E8F5A]">
-                    {formatCurrency(Math.round(s.productCount * 14500))}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono">★{s.rating}</td>
+          {sellers.length === 0 ? (
+            <div className="p-12 text-center text-xs text-[#6B726E]">
+              <Store className="w-8 h-8 text-[#6B726E] mx-auto mb-2 opacity-50" />
+              <p className="font-bold text-sm text-[#101413]">No Merchant Records</p>
+              <p className="mt-1">No seller profiles have registered in the database yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#FBFBFA] border-b border-[#E4E7E5] text-[#6B726E] font-semibold uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th className="py-3 px-4">Merchant Store</th>
+                  <th className="py-3 px-4">Location</th>
+                  <th className="py-3 px-4 text-center">Catalog Listings</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Rating</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[#E4E7E5]">
+                {sellers.map((s) => (
+                  <tr key={s.id} className="hover:bg-[#FBFBFA]">
+                    <td className="py-3.5 px-4 font-bold text-[#101413]">{s.storeName || s.name || 'Merchant'}</td>
+                    <td className="py-3.5 px-4 text-[#6B726E]">{s.city || 'Lagos'}, {s.state || 'Nigeria'}</td>
+                    <td className="py-3.5 px-4 text-center font-mono font-bold">
+                      {products.filter((p) => p.sellerId === s.userId || p.sellerId === s.id).length} items
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 capitalize">
+                        {s.status || 'Active'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono">★{s.rating || 5.0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
       {reportType === 'inventory' && (
         <div className="bg-white border border-[#E4E7E5] rounded-xl overflow-hidden shadow-2xs">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#FBFBFA] border-b border-[#E4E7E5] text-[#6B726E] font-semibold uppercase text-[10px] tracking-wider">
-              <tr>
-                <th className="py-3 px-4">Product Title</th>
-                <th className="py-3 px-4">Seller</th>
-                <th className="py-3 px-4">Unit Price</th>
-                <th className="py-3 px-4 text-center">Stock Count</th>
-                <th className="py-3 px-4">Stock Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E4E7E5]">
-              {MOCK_PRODUCTS.slice(0, 8).map((p) => {
-                const stock = p.stockCount !== undefined ? p.stockCount : 10;
-                return (
-                  <tr key={p.id} className="hover:bg-[#FBFBFA]">
-                    <td className="py-3.5 px-4 font-bold text-[#101413]">{p.title}</td>
-                    <td className="py-3.5 px-4 text-[#6B726E]">{p.seller?.name || 'Merchant'}</td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-[#101413]">{formatCurrency(p.price)}</td>
-                    <td className="py-3.5 px-4 text-center font-mono font-bold">{stock} units</td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          stock <= 2
-                            ? 'bg-rose-100 text-rose-700'
-                            : stock <= 5
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-[#E8F5EF] text-[#0E8F5A]'
-                        }`}
-                      >
-                        {stock <= 2 ? 'CRITICAL STOCK' : stock <= 5 ? 'LOW INVENTORY' : 'HEALTHY'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {products.length === 0 ? (
+            <div className="p-12 text-center text-xs text-[#6B726E]">
+              <Package className="w-8 h-8 text-[#6B726E] mx-auto mb-2 opacity-50" />
+              <p className="font-bold text-sm text-[#101413]">No Catalog Listings</p>
+              <p className="mt-1">No products have been submitted to the marketplace yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#FBFBFA] border-b border-[#E4E7E5] text-[#6B726E] font-semibold uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th className="py-3 px-4">Product Title</th>
+                  <th className="py-3 px-4">Seller</th>
+                  <th className="py-3 px-4">Unit Price</th>
+                  <th className="py-3 px-4 text-center">Stock Count</th>
+                  <th className="py-3 px-4">Stock Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E4E7E5]">
+                {products.map((p) => {
+                  const stock = p.stockCount !== undefined ? p.stockCount : p.stock ?? 0;
+                  return (
+                    <tr key={p.id} className="hover:bg-[#FBFBFA]">
+                      <td className="py-3.5 px-4 font-bold text-[#101413]">{p.title || p.name}</td>
+                      <td className="py-3.5 px-4 text-[#6B726E]">{p.sellerName || p.seller?.name || 'Verified Merchant'}</td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-[#101413]">{formatCurrency(p.price || 0)}</td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold">{stock} units</td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            stock <= 2
+                              ? 'bg-rose-100 text-rose-700'
+                              : stock <= 5
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-[#E8F5EF] text-[#0E8F5A]'
+                          }`}
+                        >
+                          {stock <= 2 ? 'CRITICAL STOCK' : stock <= 5 ? 'LOW INVENTORY' : 'HEALTHY'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 

@@ -4,10 +4,9 @@
  * recent searches history, trending popular queries, faceted filters, sorting,
  * grid/list view toggles, mobile filter drawer, and empty-state recovery.
  */
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useMarket } from '../context/MarketContext';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { productService } from '../services/productService';
 import { searchService, SearchFilters } from '../services/searchService';
 import { Product, SortOption } from '../types';
 import { formatCurrency } from '../utils/money';
@@ -73,6 +72,27 @@ export const SearchPage: React.FC = () => {
     setInputVal(searchQuery);
   }, [searchQuery]);
 
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+  // Load genuine published products from database
+  useEffect(() => {
+    let active = true;
+    productService.getPublicProducts()
+      .then((prods) => {
+        if (active) setCatalogProducts(prods);
+      })
+      .catch((err) => {
+        console.warn('Error fetching search catalog:', err);
+      })
+      .finally(() => {
+        if (active) setLoadingCatalog(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Load recent searches on mount
   useEffect(() => {
     setRecentSearches(searchService.getRecentSearches());
@@ -81,11 +101,11 @@ export const SearchPage: React.FC = () => {
   // Handle autocomplete suggestions
   useEffect(() => {
     if (inputVal.trim().length >= 2) {
-      setSuggestions(searchService.getSuggestions(inputVal, MOCK_PRODUCTS));
+      setSuggestions(searchService.getSuggestions(inputVal, catalogProducts));
     } else {
       setSuggestions([]);
     }
-  }, [inputVal]);
+  }, [inputVal, catalogProducts]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -117,8 +137,8 @@ export const SearchPage: React.FC = () => {
 
   // Filtered & Sorted Products
   const filteredProducts = useMemo(() => {
-    return searchService.filterAndSort(MOCK_PRODUCTS, searchQuery, filters, sortOption);
-  }, [searchQuery, filters, sortOption]);
+    return searchService.filterAndSort(catalogProducts, searchQuery, filters, sortOption);
+  }, [catalogProducts, searchQuery, filters, sortOption]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -146,10 +166,10 @@ export const SearchPage: React.FC = () => {
     });
   };
 
-  // Fallback recommended products for empty states
+  // Curated recommended products from real catalog for empty states
   const fallbackRecommended = useMemo(() => {
-    return MOCK_PRODUCTS.filter((p) => p.isTrending || p.isEditorialPick).slice(0, 3);
-  }, []);
+    return catalogProducts.filter((p) => p.isTrending || p.isEditorialPick).slice(0, 3);
+  }, [catalogProducts]);
 
   // Filter Sidebar & Drawer Shared Content
   const renderFilterControls = () => (
@@ -174,8 +194,8 @@ export const SearchPage: React.FC = () => {
               <span>{cat === 'all' ? 'All Departments' : cat}</span>
               <span className="text-[10px] text-[#6B726E]">
                 {cat === 'all'
-                  ? MOCK_PRODUCTS.length
-                  : MOCK_PRODUCTS.filter((p) => p.category === cat).length}
+                  ? catalogProducts.length
+                  : catalogProducts.filter((p) => p.category === cat).length}
               </span>
             </button>
           ))}

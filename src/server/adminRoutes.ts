@@ -11,6 +11,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   getDocs,
   query,
@@ -20,7 +21,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { MOCK_PRODUCTS, MOCK_STORES, MOCK_CATEGORIES } from '../data/mockData';
+import { MOCK_CATEGORIES } from '../data/mockData';
 import {
   AdminRole,
   AdminPermission,
@@ -369,27 +370,7 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
       pendingAffiliateApps = aaSnap.size;
     } catch {}
 
-    // Only inject seed figures if explicitly requested by client in seed/demo mode
-    if (isSeedMode && totalGmv === 0 && liveOrders.length === 0) {
-      totalGmv = 24850000; // ₦24.85M
-      totalPlatformCommissions = 2485000;
-      totalSellerNet = 21992250;
-      totalAffiliateCommissions = 372750;
-      ordersByStatus = {
-        pending: 8,
-        confirmed: 24,
-        processing: 19,
-        shipped: 42,
-        delivered: 186,
-        cancelled: 6,
-        refunded: 3
-      };
-      if (customersCount === 0) customersCount = 642;
-      if (sellersCount === 0) sellersCount = MOCK_STORES.length;
-      if (pendingSellerApps === 0) pendingSellerApps = 3;
-      if (affiliatesCount === 0) affiliatesCount = 28;
-      if (pendingAffiliateApps === 0) pendingAffiliateApps = 4;
-    }
+    // Always return authoritative database aggregates - no synthetic metrics
 
     const totalOrdersCount = Object.values(ordersByStatus).reduce((a, b) => a + b, 0);
     const completedOrders = (ordersByStatus.confirmed || 0) + (ordersByStatus.processing || 0) + (ordersByStatus.shipped || 0) + (ordersByStatus.delivered || 0);
@@ -464,76 +445,7 @@ adminRouter.get('/customers', async (req: Request, res: Response) => {
       console.warn('[Admin] Live customers query notice:', e?.message || e);
     }
 
-    // Default seeded customers ONLY when explicitly requested via seed data mode
-    if (isSeedMode && list.length === 0) {
-      list = [
-        {
-          id: 'user_cust_01',
-          name: 'Nneka Okonjo',
-          email: 'nneka.okonjo@gmail.com',
-          role: 'customer',
-          status: 'active',
-          ordersCount: 14,
-          totalSpend: 1250000,
-          phone: '+234 803 111 2233',
-          createdAt: '2025-11-12T10:00:00.000Z',
-          lastActivityAt: '2026-10-06T14:20:00.000Z',
-          isDemoCustomer: true
-        },
-        {
-          id: 'user_cust_02',
-          name: 'Tunde Adeleke',
-          email: 'tunde.adeleke@yahoo.com',
-          role: 'customer',
-          status: 'active',
-          ordersCount: 8,
-          totalSpend: 740000,
-          phone: '+234 812 444 5566',
-          createdAt: '2026-01-05T09:15:00.000Z',
-          lastActivityAt: '2026-10-05T19:30:00.000Z',
-          isDemoCustomer: true
-        },
-        {
-          id: 'user_cust_03',
-          name: 'Chiamaka Eze',
-          email: 'chiamaka.eze@outlook.com',
-          role: 'customer',
-          status: 'active',
-          ordersCount: 22,
-          totalSpend: 2450000,
-          phone: '+234 701 999 8877',
-          createdAt: '2025-08-14T11:45:00.000Z',
-          lastActivityAt: '2026-10-07T08:10:00.000Z',
-          isDemoCustomer: true
-        },
-        {
-          id: 'user_cust_04',
-          name: 'Ibrahim Danjuma',
-          email: 'i.danjuma@gmail.com',
-          role: 'customer',
-          status: 'suspended',
-          ordersCount: 2,
-          totalSpend: 115000,
-          phone: '+234 809 333 4411',
-          createdAt: '2026-03-20T16:00:00.000Z',
-          lastActivityAt: '2026-09-18T12:00:00.000Z',
-          isDemoCustomer: true
-        },
-        {
-          id: 'user_cust_05',
-          name: 'Folake Balogun',
-          email: 'folake.balogun@gmail.com',
-          role: 'customer',
-          status: 'active',
-          ordersCount: 1,
-          totalSpend: 48000,
-          phone: '+234 815 667 8899',
-          createdAt: '2026-10-02T13:20:00.000Z',
-          lastActivityAt: '2026-10-06T11:45:00.000Z',
-          isDemoCustomer: true
-        }
-      ];
-    }
+    // Real users from database only - no synthetic customer records
 
     // Filters
     let filtered = list;
@@ -614,29 +526,7 @@ adminRouter.get('/sellers', async (req: Request, res: Response) => {
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
     } catch {}
 
-    // Only fallback to curated verified demo stores if explicitly in seed mode
-    if (isSeedMode && list.length === 0) {
-      list = MOCK_STORES.map((s, idx) => ({
-        id: s.sellerId || `seller_${idx + 1}`,
-        storeName: s.name,
-        sellerName: s.name + ' Representative',
-        email: `${s.slug}@marketnest.stores`,
-        phone: '+234 802 334 5566',
-        status: idx === 3 ? 'under_review' : 'active',
-        verified: s.verified,
-        rating: s.rating,
-        reviewCount: s.reviewCount,
-        productsCount: s.productCount,
-        ordersCount: Math.round(s.productCount * 1.8),
-        totalRevenue: Math.round(s.productCount * 145000),
-        joinedDate: `${s.joinedYear}-01-15T08:00:00.000Z`,
-        city: s.city,
-        state: s.state,
-        storeHidden: false,
-        isDemoStore: true
-      }));
-    }
-
+    // Real sellers from database only - no synthetic records
     let filtered = list;
     if (status && status !== 'all') {
       filtered = filtered.filter((s) => (s.status || 'active') === status);
@@ -652,7 +542,7 @@ adminRouter.get('/sellers', async (req: Request, res: Response) => {
       );
     }
 
-    res.json({ status: 'success', data: filtered });
+    res.json({ status: 'success', total: filtered.length, data: filtered });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error fetching sellers' });
   }
@@ -666,61 +556,8 @@ adminRouter.get('/sellers/applications', async (req: Request, res: Response) => 
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
     } catch {}
 
-    if (list.length === 0) {
-      list = [
-        {
-          id: 'sapp_01',
-          userId: 'user_apply_01',
-          storeName: 'Kano Leathercraft Artisans',
-          sellerName: 'Mukhtar Bello',
-          email: 'mukhtar.bello@kanoleather.ng',
-          phone: '+234 803 555 1212',
-          businessType: 'Handcrafted Goods & Tanning',
-          category: 'Bags & Leather',
-          city: 'Kano Municipal',
-          state: 'Kano',
-          rcNumber: 'BN-8472910',
-          taxId: 'TIN-48201948',
-          status: 'pending',
-          submittedAt: '2026-10-05T14:30:00.000Z',
-          description: 'Specializes in vegetable-tanned goat and sheep leather bags, slippers, and artisanal organizers.'
-        },
-        {
-          id: 'sapp_02',
-          userId: 'user_apply_02',
-          storeName: 'Oyo Heritage Looms',
-          sellerName: 'Adeola Adeleke',
-          email: 'adeola@oyoheritagelooms.com',
-          phone: '+234 812 667 8900',
-          businessType: 'Textile Weaving Cooperative',
-          category: 'Fashion & Apparel',
-          city: 'Ibadan',
-          state: 'Oyo',
-          rcNumber: 'RC-1928374',
-          taxId: 'TIN-98102934',
-          status: 'pending',
-          submittedAt: '2026-10-06T09:15:00.000Z',
-          description: 'Preserving traditional Aso-Oke weaving techniques with modern color palettes and ready-to-wear accessories.'
-        },
-        {
-          id: 'sapp_03',
-          userId: 'user_apply_03',
-          storeName: 'Benin Bronze Casting Guild',
-          sellerName: 'Osahon Igbinedion',
-          email: 'guild@beninbronze.ng',
-          phone: '+234 805 123 4567',
-          businessType: 'Art & Sculpture Atelier',
-          category: 'Art & Collectibles',
-          city: 'Benin City',
-          state: 'Edo',
-          rcNumber: 'BN-3392019',
-          taxId: 'TIN-33291048',
-          status: 'pending',
-          submittedAt: '2026-10-06T18:00:00.000Z',
-          description: 'Direct cast bronze sculptures, figurines, and ceremonial vessels crafted using the ancient lost-wax process.'
-        }
-      ];
-    }
+    // Real seller applications from database only
+    res.json({ status: 'success', total: list.length, data: list });
 
     res.json({ status: 'success', data: list });
   } catch (err: any) {
@@ -807,88 +644,34 @@ adminRouter.post('/sellers/:id/status', async (req: Request, res: Response) => {
 // ======================================================================
 // 4. AFFILIATE MANAGEMENT & APPLICATIONS
 // ======================================================================
+// 4. AFFILIATE & CREATOR PROGRAM MANAGEMENT
+// ======================================================================
 adminRouter.get('/affiliates', async (req: Request, res: Response) => {
   try {
+    const { search, status } = req.query;
     let list: any[] = [];
     try {
       const snap = await getDocs(collection(db, 'affiliateProfiles'));
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-    } catch {}
-
-    if (list.length === 0) {
-      list = [
-        {
-          id: 'aff_01',
-          userId: 'user_aff_01',
-          displayName: 'Amina Style Edit',
-          code: 'MNAMINA',
-          status: 'active',
-          commissionRate: 0.05,
-          promotionalChannel: 'Instagram & TikTok',
-          channelUrl: 'https://instagram.com/amina_styled',
-          totalClicks: 1420,
-          totalConversions: 84,
-          conversionRate: 5.9,
-          totalEarnings: 385000,
-          pendingEarnings: 42000,
-          approvedEarnings: 343000,
-          joinedDate: '2026-02-10T11:00:00.000Z'
-        },
-        {
-          id: 'aff_02',
-          userId: 'user_aff_02',
-          displayName: 'Lagos Interior Digest',
-          code: 'MNLIVING',
-          status: 'active',
-          commissionRate: 0.06,
-          promotionalChannel: 'Editorial Newsletter',
-          channelUrl: 'https://lagosliving.substack.com',
-          totalClicks: 3100,
-          totalConversions: 145,
-          conversionRate: 4.6,
-          totalEarnings: 780000,
-          pendingEarnings: 88000,
-          approvedEarnings: 692000,
-          joinedDate: '2026-01-18T14:30:00.000Z'
-        },
-        {
-          id: 'aff_03',
-          userId: 'user_aff_03',
-          displayName: 'Naija Tech Hub',
-          code: 'MNTECH99',
-          status: 'active',
-          commissionRate: 0.04,
-          promotionalChannel: 'YouTube & X',
-          channelUrl: 'https://youtube.com/@naijatechhub',
-          totalClicks: 4800,
-          totalConversions: 210,
-          conversionRate: 4.3,
-          totalEarnings: 940000,
-          pendingEarnings: 110000,
-          approvedEarnings: 830000,
-          joinedDate: '2025-12-05T09:20:00.000Z'
-        },
-        {
-          id: 'aff_04',
-          userId: 'user_aff_04',
-          displayName: 'Heritage Chic',
-          code: 'MNHERITAGE',
-          status: 'suspended',
-          commissionRate: 0.05,
-          promotionalChannel: 'WhatsApp Broadcast',
-          channelUrl: 'https://chat.whatsapp.com/heritagechic',
-          totalClicks: 210,
-          totalConversions: 4,
-          conversionRate: 1.9,
-          totalEarnings: 18000,
-          pendingEarnings: 0,
-          approvedEarnings: 18000,
-          joinedDate: '2026-04-12T16:00:00.000Z'
-        }
-      ];
+    } catch (e: any) {
+      console.warn('[Admin] Error fetching affiliate profiles:', e?.message || e);
     }
 
-    res.json({ status: 'success', data: list });
+    let filtered = list;
+    if (status && status !== 'all') {
+      filtered = filtered.filter((a) => (a.status || 'active').toLowerCase() === String(status).toLowerCase());
+    }
+    if (search) {
+      const q = String(search).toLowerCase();
+      filtered = filtered.filter(
+        (a) =>
+          (a.displayName || a.fullName || '').toLowerCase().includes(q) ||
+          (a.code || '').toLowerCase().includes(q) ||
+          (a.channel || '').toLowerCase().includes(q)
+      );
+    }
+
+    res.json({ status: 'success', total: filtered.length, data: filtered });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error fetching affiliates' });
   }
@@ -896,44 +679,27 @@ adminRouter.get('/affiliates', async (req: Request, res: Response) => {
 
 adminRouter.get('/affiliates/applications', async (req: Request, res: Response) => {
   try {
+    const { status } = req.query;
     let list: any[] = [];
     try {
       const snap = await getDocs(collection(db, 'affiliateApplications'));
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-    } catch {}
-
-    if (list.length === 0) {
-      list = [
-        {
-          id: 'aapp_01',
-          userId: 'user_cand_01',
-          fullName: 'Bimbo Adeleke',
-          displayName: 'Bimbo Couture Picks',
-          channel: 'Instagram',
-          channelUrl: 'https://instagram.com/bimbocouture',
-          audience: '35k fashion & traditional wedding wardrobe followers in Lagos & Abuja',
-          preferredCategories: ['Fashion & Apparel', 'Jewelry & Accessories'],
-          reason: 'Passionate about elevating made-in-Nigeria designers and contemporary bridal crafts.',
-          status: 'pending',
-          submittedAt: '2026-10-06T11:20:00.000Z'
-        },
-        {
-          id: 'aapp_02',
-          userId: 'user_cand_02',
-          fullName: 'Chidi Nwosu',
-          displayName: 'TechLagos Reviews',
-          channel: 'YouTube',
-          channelUrl: 'https://youtube.com/@techlagos',
-          audience: '50k tech enthusiasts, remote creators, and software engineers in Nigeria',
-          preferredCategories: ['Electronics & Workspace', 'Gadgets'],
-          reason: 'I review desk setups, noise-canceling headphones, and verified electronics sold on Nigerian rails.',
-          status: 'pending',
-          submittedAt: '2026-10-06T15:45:00.000Z'
-        }
-      ];
+    } catch (e: any) {
+      console.warn('[Admin] Error fetching affiliate applications:', e?.message || e);
     }
 
-    res.json({ status: 'success', data: list });
+    // Sort newest first
+    list.sort((a, b) => {
+      const tA = a.submittedAt || a.createdAt ? new Date(a.submittedAt || a.createdAt).getTime() : 0;
+      const tB = b.submittedAt || b.createdAt ? new Date(b.submittedAt || b.createdAt).getTime() : 0;
+      return tB - tA;
+    });
+
+    if (status && status !== 'all') {
+      list = list.filter((a) => (a.status || 'pending').toLowerCase() === String(status).toLowerCase());
+    }
+
+    res.json({ status: 'success', total: list.length, data: list });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error fetching affiliate applications' });
   }
@@ -942,20 +708,129 @@ adminRouter.get('/affiliates/applications', async (req: Request, res: Response) 
 adminRouter.post('/affiliates/applications/:id/review', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { action, customCode, commissionRate = 0.05, reason, adminId = 'admin_super', adminName = 'Platform Admin' } = req.body;
+    const {
+      action,
+      customCode,
+      commissionRate = 0.05,
+      reason,
+      adminId = 'admin_super',
+      adminName = 'Platform Admin'
+    } = req.body;
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be approve or reject' });
+    }
 
     const nowIso = new Date().toISOString();
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    try {
-      await updateDoc(doc(db, 'affiliateApplications', id), {
-        status: newStatus,
-        reviewedAt: nowIso,
-        reviewedBy: adminId,
-        reviewReason: reason || null,
-        updatedAt: nowIso
-      });
-    } catch {}
+    const appRef = doc(db, 'affiliateApplications', id);
+    const appSnap = await getDoc(appRef);
+    if (!appSnap.exists()) {
+      return res.status(404).json({ error: 'Affiliate application not found.' });
+    }
+    const appData = appSnap.data();
+
+    // Prevent duplicate approval
+    if (appData.status === 'approved' && action === 'approve') {
+      return res.json({ status: 'success', message: 'Application was already approved.' });
+    }
+
+    // Update application record
+    await updateDoc(appRef, {
+      status: newStatus,
+      reviewedAt: nowIso,
+      reviewedBy: adminId,
+      reviewerName: adminName,
+      reviewReason: reason || null,
+      updatedAt: nowIso
+    });
+
+    let assignedCode = customCode;
+
+    if (action === 'approve') {
+      const applicantUserId = appData.userId;
+      if (!assignedCode) {
+        const cleanName = (appData.displayName || appData.fullName || 'CREATOR')
+          .replace(/[^A-Za-z0-9]/g, '')
+          .toUpperCase()
+          .slice(0, 6);
+        assignedCode = `MN${cleanName}`;
+      }
+
+      // Provision or activate genuine affiliateProfile in Firestore
+      const profRef = doc(db, 'affiliateProfiles', applicantUserId);
+      await setDoc(
+        profRef,
+        {
+          userId: applicantUserId,
+          fullName: appData.fullName || 'Creator Partner',
+          displayName: appData.displayName || appData.fullName || 'Creator Partner',
+          channel: appData.channel || 'Social Media',
+          channelUrl: appData.channelUrl || '',
+          audience: appData.audience || '',
+          code: assignedCode,
+          commissionRate: Number(commissionRate) || 0.05,
+          status: 'active',
+          totalEarnings: 0,
+          pendingEarnings: 0,
+          approvedEarnings: 0,
+          totalConversions: 0,
+          totalClicks: 0,
+          preferredCategories: appData.preferredCategories || [],
+          approvedAt: nowIso,
+          approvedBy: adminId,
+          createdAt: appData.createdAt || nowIso,
+          updatedAt: nowIso
+        },
+        { merge: true }
+      );
+
+      // Update user account role & permissions
+      try {
+        await updateDoc(doc(db, 'users', applicantUserId), {
+          isAffiliate: true,
+          affiliateCode: assignedCode,
+          updatedAt: nowIso
+        });
+      } catch (uErr) {
+        console.warn('[Admin] User record update note:', uErr);
+      }
+
+      // Send in-app notification to applicant
+      try {
+        const notifId = `notif_aff_app_${Date.now()}`;
+        await setDoc(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: applicantUserId,
+          title: 'Affiliate Partner Program Approved! 🎉',
+          message: `Congratulations! Your affiliate application has been approved. Your verified partner code is ${assignedCode} (${(Number(commissionRate) * 100).toFixed(1)}% commission). Access your dashboard to generate tracked referral links.`,
+          type: 'affiliate',
+          read: false,
+          createdAt: nowIso
+        });
+      } catch (nErr) {
+        console.warn('[Admin] Notification creation note:', nErr);
+      }
+    } else {
+      // Rejection: send notification
+      try {
+        const notifId = `notif_aff_rej_${Date.now()}`;
+        await setDoc(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: appData.userId,
+          title: 'Affiliate Partner Application Update',
+          message: reason
+            ? `Your application has been reviewed and was declined at this time. Reason: ${reason}`
+            : 'Your application has been reviewed and was declined at this time.',
+          type: 'affiliate',
+          read: false,
+          createdAt: nowIso
+        });
+      } catch (nErr) {
+        console.warn('[Admin] Rejection notification note:', nErr);
+      }
+    }
 
     await logAdminAudit({
       action: action === 'approve' ? 'AFFILIATE_APPROVED' : 'AFFILIATE_REJECTED',
@@ -964,11 +839,16 @@ adminRouter.post('/affiliates/applications/:id/review', async (req: Request, res
       actorName: adminName,
       entityType: 'affiliateApplication',
       entityId: id,
-      metadata: { action, customCode, commissionRate, reason }
+      metadata: { action, customCode: assignedCode, commissionRate, reason, userId: appData.userId }
     });
 
-    res.json({ status: 'success', message: `Affiliate application marked as ${newStatus}` });
+    res.json({
+      status: 'success',
+      message: `Affiliate application for ${appData.fullName || id} has been ${newStatus}.`,
+      assignedCode
+    });
   } catch (err: any) {
+    console.error('[Admin] Error reviewing affiliate application:', err);
     res.status(500).json({ error: err.message || 'Error reviewing affiliate application' });
   }
 });
@@ -983,28 +863,44 @@ adminRouter.get('/products', async (req: Request, res: Response) => {
 
     try {
       const snap = await getDocs(collection(db, 'products'));
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-    } catch {}
-
-    // Fallback or merge with mock catalogue
-    if (list.length === 0) {
-      list = MOCK_PRODUCTS.map((p) => ({
-        ...p,
-        sellerName: p.seller?.name || 'Verified Merchant',
-        stock: p.stockCount !== undefined ? p.stockCount : 15,
-        status: p.status || 'active',
-        createdAt: '2026-09-01T08:00:00.000Z',
-        updatedAt: '2026-10-06T12:00:00.000Z'
-      }));
+      snap.forEach((d) => {
+        const data = d.data();
+        list.push({
+          id: d.id,
+          ...data,
+          title: data.title || data.name || 'Untitled Product',
+          price: data.price || 0,
+          stock: data.stockCount ?? data.stock ?? 0,
+          status: data.status || 'active',
+          sellerName: data.seller?.name || data.storeName || 'Verified Merchant',
+          createdAt: data.createdAt || new Date().toISOString()
+        });
+      });
+    } catch (e: any) {
+      console.warn('[Admin] Error querying products from database:', e?.message || e);
     }
 
     let filtered = list;
-    if (status && status !== 'all') {
-      filtered = filtered.filter((p) => (p.status || 'active') === status);
+
+    // Filter out soft-deleted items unless specifically requested
+    if (status !== 'archived' && status !== 'deleted') {
+      filtered = filtered.filter((p) => p.isDeleted !== true);
     }
-    if (category && category !== 'all') {
-      filtered = filtered.filter((p) => p.category === category);
+
+    const statusStr = typeof status === 'string' ? status.trim().toLowerCase() : '';
+    if (statusStr && statusStr !== 'all') {
+      if (statusStr === 'published' || statusStr === 'active') {
+        filtered = filtered.filter((p) => p.status === 'published' || p.status === 'active');
+      } else {
+        filtered = filtered.filter((p) => (p.status || '').toLowerCase() === statusStr);
+      }
     }
+
+    const catStr = typeof category === 'string' ? category.trim() : '';
+    if (catStr && catStr !== 'all') {
+      filtered = filtered.filter((p) => p.category === catStr);
+    }
+
     if (search) {
       const q = String(search).toLowerCase();
       filtered = filtered.filter(
@@ -1015,7 +911,14 @@ adminRouter.get('/products', async (req: Request, res: Response) => {
       );
     }
 
-    res.json({ status: 'success', data: filtered });
+    // Sort newest first
+    filtered.sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tB - tA;
+    });
+
+    res.json({ status: 'success', total: filtered.length, data: filtered });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error fetching products' });
   }
@@ -1026,25 +929,33 @@ adminRouter.post('/products/:id/moderate', async (req: Request, res: Response) =
     const { id } = req.params;
     const { action, reason, adminId = 'admin_super', adminName = 'Platform Admin' } = req.body;
 
-    if (!['approve', 'reject', 'hide', 'archive', 'flag'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid moderation action' });
+    const validActions = ['approve', 'publish', 'reject', 'unpublish', 'hide', 'suspend', 'archive', 'flag'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ error: `Invalid moderation action: ${action}` });
     }
 
-    let nextStatus = 'active';
-    if (action === 'hide') nextStatus = 'hidden';
-    if (action === 'archive') nextStatus = 'archived';
-    if (action === 'flag') nextStatus = 'flagged';
-    if (action === 'reject') nextStatus = 'rejected';
+    let nextStatus = 'published';
+    if (action === 'approve' || action === 'publish') nextStatus = 'published';
+    else if (action === 'reject') nextStatus = 'rejected';
+    else if (action === 'unpublish' || action === 'hide') nextStatus = 'draft';
+    else if (action === 'suspend') nextStatus = 'suspended';
+    else if (action === 'archive') nextStatus = 'archived';
+    else if (action === 'flag') nextStatus = 'flagged';
 
-    try {
-      await updateDoc(doc(db, 'products', id), {
-        status: nextStatus,
-        moderatedAt: new Date().toISOString(),
-        moderatedBy: adminId,
-        moderationReason: reason || null,
-        updatedAt: new Date().toISOString()
-      });
-    } catch {}
+    const pRef = doc(db, 'products', id);
+    const pSnap = await getDoc(pRef);
+    if (!pSnap.exists()) {
+      return res.status(404).json({ error: 'Product not found in database.' });
+    }
+
+    await updateDoc(pRef, {
+      status: nextStatus,
+      moderatedAt: new Date().toISOString(),
+      moderatedBy: adminId,
+      moderatorName: adminName,
+      moderationReason: reason || null,
+      updatedAt: new Date().toISOString()
+    });
 
     await logAdminAudit({
       action: `PRODUCT_${action.toUpperCase()}`,
@@ -1059,6 +970,54 @@ adminRouter.post('/products/:id/moderate', async (req: Request, res: Response) =
     res.json({ status: 'success', message: `Product ${id} status set to ${nextStatus}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error moderating product' });
+  }
+});
+
+adminRouter.delete('/products/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const permanent = req.query.permanent === 'true';
+    const { adminId = 'admin_super', adminName = 'Platform Admin', reason } = req.body || {};
+
+    const pRef = doc(db, 'products', id);
+    const pSnap = await getDoc(pRef);
+    if (!pSnap.exists()) {
+      return res.status(404).json({ error: 'Product not found in database.' });
+    }
+
+    const pData = pSnap.data();
+
+    if (permanent) {
+      await deleteDoc(pRef);
+    } else {
+      // Soft deletion for auditability
+      await updateDoc(pRef, {
+        isDeleted: true,
+        status: 'archived',
+        deletedAt: new Date().toISOString(),
+        deletedBy: adminId,
+        deletionReason: reason || 'Deleted by Administrator',
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    await logAdminAudit({
+      action: permanent ? 'PRODUCT_PERMANENT_DELETED' : 'PRODUCT_SOFT_DELETED',
+      actorId: adminId,
+      actorRole: 'moderator',
+      actorName: adminName,
+      entityType: 'product',
+      entityId: id,
+      metadata: { title: pData.title || pData.name, sellerId: pData.sellerId, permanent, reason }
+    });
+
+    res.json({
+      status: 'success',
+      message: `Product ${id} has been permanently deleted from the marketplace.`
+    });
+  } catch (err: any) {
+    console.error('[Admin] Error deleting product:', err);
+    res.status(500).json({ error: err.message || 'Error deleting product' });
   }
 });
 
@@ -1182,83 +1141,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
     } catch {}
 
-    // Only inject seed orders when explicitly in seed data mode
-    if (isSeedMode && list.length === 0) {
-      list = [
-        {
-          id: 'ord_sample_01',
-          orderNumber: 'MN-ORD-20261006-8F92KD',
-          customerId: 'user_cust_01',
-          customerName: 'Nneka Okonjo',
-          customerEmail: 'nneka.okonjo@gmail.com',
-          total: 125000,
-          subtotal: 120000,
-          deliveryFee: 5000,
-          paymentStatus: 'paid',
-          orderStatus: 'confirmed',
-          paymentChannel: 'card',
-          paymentReference: 'MN-PAY-20261006-8F92KD',
-          sellers: ['Urban Finds', 'Alara Studio Living'],
-          itemsCount: 3,
-          createdAt: '2026-10-06T14:20:00.000Z',
-          isDemoOrder: true
-        },
-        {
-          id: 'ord_sample_02',
-          orderNumber: 'MN-ORD-20261006-7H21XP',
-          customerId: 'user_cust_02',
-          customerName: 'Tunde Adeleke',
-          customerEmail: 'tunde.adeleke@yahoo.com',
-          total: 84000,
-          subtotal: 80000,
-          deliveryFee: 4000,
-          paymentStatus: 'paid',
-          orderStatus: 'processing',
-          paymentChannel: 'bank_transfer',
-          paymentReference: 'MN-PAY-20261006-7H21XP',
-          sellers: ['Yaba Circuit & Tech'],
-          itemsCount: 1,
-          createdAt: '2026-10-06T11:15:00.000Z',
-          isDemoOrder: true
-        },
-        {
-          id: 'ord_sample_03',
-          orderNumber: 'MN-ORD-20261005-9Q44LA',
-          customerId: 'user_cust_03',
-          customerName: 'Chiamaka Eze',
-          customerEmail: 'chiamaka.eze@outlook.com',
-          total: 215000,
-          subtotal: 210000,
-          deliveryFee: 5000,
-          paymentStatus: 'paid',
-          orderStatus: 'shipped',
-          paymentChannel: 'card',
-          paymentReference: 'MN-PAY-20261005-9Q44LA',
-          sellers: ['Urban Finds', 'Zaria Botanical Lab'],
-          itemsCount: 4,
-          createdAt: '2026-10-05T09:30:00.000Z',
-          isDemoOrder: true
-        },
-        {
-          id: 'ord_sample_04',
-          orderNumber: 'MN-ORD-20261004-3K18VV',
-          customerId: 'user_cust_04',
-          customerName: 'Ibrahim Danjuma',
-          customerEmail: 'i.danjuma@gmail.com',
-          total: 62000,
-          subtotal: 58000,
-          deliveryFee: 4000,
-          paymentStatus: 'failed',
-          orderStatus: 'cancelled',
-          paymentChannel: 'card',
-          paymentReference: 'MN-PAY-20261004-3K18VV',
-          sellers: ['Naija Harvest Provisions'],
-          itemsCount: 2,
-          createdAt: '2026-10-04T16:00:00.000Z',
-          isDemoOrder: true
-        }
-      ];
-    }
+    // Real orders from database only - no fake transactions
 
     let filtered = list;
     if (paymentStatus && paymentStatus !== 'all') {

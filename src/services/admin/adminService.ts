@@ -94,8 +94,10 @@ export const adminService = {
     return json.data;
   },
 
-  async getAffiliateApplications() {
-    const res = await fetch('/api/admin/affiliates/applications');
+  async getAffiliateApplications(status?: string) {
+    const params = new URLSearchParams();
+    if (status && status !== 'all') params.append('status', status);
+    const res = await fetch(`/api/admin/affiliates/applications?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch affiliate applications');
     const json = await res.json();
     return json.data;
@@ -129,13 +131,31 @@ export const adminService = {
     return json.data;
   },
 
-  async moderateProduct(id: string, action: 'approve' | 'reject' | 'hide' | 'archive' | 'flag', reason?: string, adminInfo?: { id: string; name: string }) {
+  async moderateProduct(
+    id: string,
+    action: 'approve' | 'publish' | 'reject' | 'unpublish' | 'hide' | 'suspend' | 'archive' | 'flag',
+    reason?: string,
+    adminInfo?: { id: string; name: string }
+  ) {
     const res = await fetch(`/api/admin/products/${id}/moderate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, reason, adminId: adminInfo?.id, adminName: adminInfo?.name })
     });
     if (!res.ok) throw new Error('Failed to moderate product');
+    return res.json();
+  },
+
+  async deleteProduct(id: string, permanent = false, adminInfo?: { id: string; name: string }) {
+    const res = await fetch(`/api/admin/products/${id}?permanent=${permanent}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId: adminInfo?.id, adminName: adminInfo?.name })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete product');
+    }
     return res.json();
   },
 

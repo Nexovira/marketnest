@@ -38,6 +38,7 @@ import { phase12Router } from './src/server/phase12ScalabilityRoutes';
 import { phase13Router } from './src/server/phase13BiRoutes';
 import { phase14Router } from './src/server/phase14RiskRoutes';
 import { phase17Router } from './src/server/phase17MarketingRoutes';
+import { productRouter } from './src/server/productRoutes';
 import { ensureServerAuth } from './src/server/serverAuth';
 
 // Load environment variables
@@ -1084,6 +1085,11 @@ app.get('/api/payments/status/:reference', async (req: Request, res: Response) =
     res.status(500).json({ error: err.message || 'Error checking payment status.' });
   }
 });
+
+// ----------------------------------------------------------------------
+// Public Catalog & Discovery API Routes (Real Database Governance)
+// ----------------------------------------------------------------------
+app.use('/api', productRouter);
 
 // ----------------------------------------------------------------------
 // Phase 7: MarketNest Admin Control Center API Routes

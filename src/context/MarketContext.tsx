@@ -5,7 +5,6 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { MOCK_PRODUCTS } from '../data/mockData';
 import {
   AccountTab,
   ActivePage,
@@ -241,27 +240,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Cart State with Guest Cart loading
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     const guestItems = loadGuestCart();
-    if (guestItems && guestItems.length > 0) {
-      return guestItems;
-    }
-    // Fallback initial starter demo item if brand new
-    const initialProduct = MOCK_PRODUCTS[0];
-    return [
-      {
-        id: `${initialProduct.id}-default`,
-        productId: initialProduct.id,
-        sellerId: initialProduct.sellerId || initialProduct.seller?.id || 'seller_01',
-        storeId: initialProduct.seller?.id || 'store_01',
-        name: initialProduct.title || initialProduct.name || 'Adire Silk Kimono',
-        image: initialProduct.images?.[0] || '',
-        price: initialProduct.price,
-        unitPrice: initialProduct.price,
-        quantity: 1,
-        lineTotal: initialProduct.price,
-        addedAt: new Date().toISOString(),
-        product: initialProduct
-      }
-    ];
+    return guestItems && guestItems.length > 0 ? guestItems : [];
   });
 
   // Wishlist State
@@ -272,7 +251,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch {
       // Ignore parse errors
     }
-    return ['prod_001', 'prod_003'];
+    return [];
   });
 
   // Phase 8: Product Comparison State (Max 4 items)
@@ -605,8 +584,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return false;
     }
     setCompareProductIds((prev) => [...prev, productId]);
-    const p = MOCK_PRODUCTS.find((it) => it.id === productId);
-    showToast('Added to Compare', `"${p?.title || 'Product'}" added to comparison.`, 'success', {
+    showToast('Added to Compare', 'Item added to comparison matrix.', 'success', {
       label: 'View Compare',
       onClick: () => navigateTo('compare')
     });
@@ -627,8 +605,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const saveForLater = (productId: string) => {
     if (!savedForLaterIds.includes(productId)) {
       setSavedForLaterIds((prev) => [...prev, productId]);
-      const p = MOCK_PRODUCTS.find((it) => it.id === productId);
-      showToast('Saved for Later', `"${p?.title || 'Item'}" saved for later.`, 'success');
+      showToast('Saved for Later', 'Item moved to your saved items shelf.', 'success');
     }
   };
 
@@ -640,16 +617,15 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Wishlist actions (optimistic UI + Firestore sync when authenticated)
   const toggleWishlist = async (productId: string) => {
-    const product = MOCK_PRODUCTS.find((p) => p.id === productId);
     const exists = wishlistIds.includes(productId);
 
     // Optimistic state update
     if (exists) {
       setWishlistIds((prev) => prev.filter((id) => id !== productId));
-      showToast('Saved Item Removed', `${product?.title || 'Item'} removed from your saved items.`, 'info');
+      showToast('Saved Item Removed', 'Item removed from your saved items.', 'info');
     } else {
       setWishlistIds((prev) => [...prev, productId]);
-      showToast('Saved to Wishlist', `${product?.title || 'Item'} added to your saved items.`, 'success');
+      showToast('Saved to Wishlist', 'Item added to your saved items.', 'success');
       if (!isAuthenticated) {
         setShowGuestAuthModal(true);
       }

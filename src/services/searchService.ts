@@ -5,7 +5,6 @@
  */
 
 import { Product, SearchSuggestion, SortOption } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
 
 const RECENT_SEARCHES_KEY = 'marketnest_recent_searches';
 const POPULAR_SEARCHES = [
@@ -35,7 +34,7 @@ export const searchService = {
   /**
    * Autocomplete search suggestions while typing
    */
-  getSuggestions(queryText: string, products: Product[] = MOCK_PRODUCTS): SearchSuggestion[] {
+  getSuggestions(queryText: string, products: Product[] = []): SearchSuggestion[] {
     if (!queryText || queryText.trim().length < 2) return [];
     const q = queryText.toLowerCase().trim();
     const suggestions: SearchSuggestion[] = [];

@@ -3,13 +3,14 @@
  * Marketplace catalog listing with faceted filtering, multi-column responsive grid, and sorting.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useMarket } from '../context/MarketContext';
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '../data/mockData';
+import { MOCK_CATEGORIES } from '../data/mockData';
 import { ProductCard } from '../components/ProductCard';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { Button } from '../components/ui/Button';
-import { CategoryId, SortOption } from '../types';
+import { CategoryId, SortOption, Product } from '../types';
+import { productService } from '../services/productService';
 import {
   SlidersHorizontal,
   X,
@@ -31,10 +32,32 @@ export const ShopPage: React.FC = () => {
   } = useMarket();
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filter & Sort Logic
+  // Load genuine published products from database
+  useEffect(() => {
+    let active = true;
+    const fetchCatalog = async () => {
+      setLoading(true);
+      try {
+        const prods = await productService.getPublicProducts();
+        if (active) setCatalogProducts(prods);
+      } catch (err) {
+        console.warn('Error loading shop products from database:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchCatalog();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Filter & Sort Logic over real database records
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter((product) => {
+    return catalogProducts.filter((product) => {
       // Search query filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -275,7 +298,7 @@ export const ShopPage: React.FC = () => {
                   }`}
                 >
                   <span>All Categories</span>
-                  <span className="tabular-nums">{MOCK_PRODUCTS.length}</span>
+                  <span className="tabular-nums">{catalogProducts.length}</span>
                 </button>
               </li>
               {MOCK_CATEGORIES.map((cat) => (
@@ -289,7 +312,9 @@ export const ShopPage: React.FC = () => {
                     }`}
                   >
                     <span>{cat.name}</span>
-                    <span className="tabular-nums">{cat.itemCount}</span>
+                    <span className="tabular-nums">
+                      {catalogProducts.filter((p) => p.category === cat.id).length}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -393,7 +418,12 @@ export const ShopPage: React.FC = () => {
 
         {/* PRODUCT GRID (Adaptive 4-col desktop, 3-col tablet, 2-col mobile) */}
         <main className="lg:col-span-9">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="py-24 text-center text-xs text-[#6B726E]">
+              <div className="w-8 h-8 border-2 border-[#101413] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              Loading verified products from marketplace database...
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="bg-[#FFFFFF] border border-[#E4E7E5] rounded-xl p-12 text-center max-w-lg mx-auto my-8">
               <div className="w-12 h-12 rounded-full bg-[#F7F5F0] text-[#6B726E] flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-6 h-6" />

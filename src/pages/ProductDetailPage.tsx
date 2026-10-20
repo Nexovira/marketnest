@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
+import { useSeller } from '../context/SellerContext';
 import { getAffiliateProfile } from '../services/affiliate/affiliateService';
 import { reviewService } from '../services/reviewService';
 import { qaService } from '../services/qaService';
@@ -25,7 +26,7 @@ import {
   ReviewRating,
   Product
 } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { productService } from '../services/productService';
 import { formatCurrency } from '../services/currencyService';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { PriceDisplay } from '../components/ui/PriceDisplay';
@@ -60,6 +61,7 @@ import {
   Flag,
   ZoomIn,
   Zap,
+  ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import { ReportProductModal } from '../components/ReportProductModal';
@@ -79,16 +81,72 @@ export const ProductDetailPage: React.FC = () => {
   const { firebaseUser, profile, isAuthenticated } = useAuth();
 
   const [affiliateProfile, setAffiliateProfile] = useState<AffiliateProfile | null>(null);
+  const { sellerProducts } = useSeller();
 
-  // Active product or default first product
-  const product = useMemo(() => {
-    return MOCK_PRODUCTS.find((p) => p.id === selectedProductId) || MOCK_PRODUCTS[0];
-  }, [selectedProductId]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [productLoading, setProductLoading] = useState(true);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchCurrentProduct = async () => {
+      if (!selectedProductId) {
+        setProductLoading(false);
+        return;
+      }
+      setProductLoading(true);
+      setProductError(null);
+
+      try {
+        // If the logged in seller has this product in their catalog
+        const fromSeller = sellerProducts?.find((p) => p.id === selectedProductId);
+        if (fromSeller) {
+          if (active) setProduct(fromSeller);
+          return;
+        }
+
+        const [fetched, allProds] = await Promise.all([
+          productService.getProductById(selectedProductId),
+          productService.getPublicProducts()
+        ]);
+
+        if (active) {
+          setCatalogProducts(allProds);
+          if (fetched) {
+            setProduct(fetched);
+          } else {
+            setProductError('This product does not exist, has been unpublished, or is pending administrator approval.');
+          }
+        }
+      } catch (err: any) {
+        if (active) setProductError('Unable to load product listing from database.');
+      } finally {
+        if (active) setProductLoading(false);
+      }
+    };
+
+    fetchCurrentProduct();
+    return () => {
+      active = false;
+    };
+  }, [selectedProductId, sellerProducts]);
+
+  // Normalized product gallery supporting both multiple images and legacy single imageUrl
+  const productGallery: string[] = useMemo(() => {
+    if (Array.isArray(product?.images) && product.images.length > 0) {
+      return product.images;
+    }
+    if ((product as any)?.imageUrl) {
+      return [(product as any).imageUrl];
+    }
+    return ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'];
+  }, [product?.images, (product as any)?.imageUrl]);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(
-    product.variants?.[0]?.id
+    product?.variants?.[0]?.id
   );
   const [activeTab, setActiveTab] = useState<'specs' | 'delivery' | 'escrow' | 'reviews' | 'qa'>('specs');
 
@@ -202,22 +260,22 @@ export const ProductDetailPage: React.FC = () => {
       setQuestions(qs);
     });
 
-    // Load recommendations
-    setFrequentlyBought(recommendationService.getFrequentlyBoughtTogether(product, MOCK_PRODUCTS));
-    setFromThisSeller(recommendationService.getFromThisSeller(product.sellerId, product.id, MOCK_PRODUCTS));
-    setYouMayAlsoLike(recommendationService.getYouMayAlsoLike(product, MOCK_PRODUCTS));
-    setRecentlyViewed(recommendationService.getRecentlyViewedProducts(MOCK_PRODUCTS).filter((p) => p.id !== product.id));
+    // Load recommendations from real database catalog
+    setFrequentlyBought(recommendationService.getFrequentlyBoughtTogether(product, catalogProducts));
+    setFromThisSeller(recommendationService.getFromThisSeller(product.sellerId, product.id, catalogProducts));
+    setYouMayAlsoLike(recommendationService.getYouMayAlsoLike(product, catalogProducts));
+    setRecentlyViewed(recommendationService.getRecentlyViewedProducts(catalogProducts).filter((p) => p.id !== product.id));
 
     // Reset selection state
     setActiveImageIndex(0);
     setQuantity(1);
     setSelectedVariantId(product.variants?.[0]?.id);
-  }, [product.id]);
+  }, [product?.id, catalogProducts]);
 
-  const isSaved = isWishlisted(product.id);
-  const isCompared = isComparing(product.id);
-  const currentVariant = product.variants?.find((v) => v.id === selectedVariantId);
-  const activePrice = currentVariant ? currentVariant.price : product.price;
+  const isSaved = product ? isWishlisted(product.id) : false;
+  const isCompared = product ? isComparing(product.id) : false;
+  const currentVariant = product?.variants?.find((v) => v.id === selectedVariantId);
+  const activePrice = currentVariant ? currentVariant.price : (product?.price || 0);
 
   // Rating Distribution
   const ratingDist: RatingDistribution = useMemo(() => {
@@ -231,15 +289,18 @@ export const ProductDetailPage: React.FC = () => {
   }, [reviews, selectedStarFilter]);
 
   const handleAddToCart = () => {
+    if (!product) return;
     addToCart(product, quantity, currentVariant);
   };
 
   const handleBuyNow = () => {
+    if (!product) return;
     addToCart(product, quantity, currentVariant);
     setIsCartOpen(true);
   };
 
   const handleShare = () => {
+    if (!product) return;
     let shareUrl = `${window.location.origin}/product/${product.id}`;
     if (affiliateProfile?.code) {
       shareUrl += `?ref=${affiliateProfile.code}`;
@@ -275,6 +336,7 @@ export const ProductDetailPage: React.FC = () => {
 
     setIsSubmittingReview(true);
     try {
+      if (!product) return;
       const newRev = await reviewService.submitReview({
         productId: product.id,
         customerId: firebaseUser!.uid,
@@ -311,6 +373,7 @@ export const ProductDetailPage: React.FC = () => {
 
     setIsSubmittingQuestion(true);
     try {
+      if (!product) return;
       const newQ = await qaService.askQuestion({
         productId: product.id,
         customerId: firebaseUser!.uid,
@@ -339,11 +402,40 @@ export const ProductDetailPage: React.FC = () => {
 
   // Bundle Add
   const handleAddBundle = (complementaryProduct: Product) => {
+    if (!product) return;
     addToCart(product, 1);
     addToCart(complementaryProduct, 1);
     setIsCartOpen(true);
     showToast('Bundle Added to Bag', 'Both items added with combined checkout.', 'success');
   };
+
+  if (productLoading) {
+    return (
+      <div className="max-w-4xl mx-auto py-24 text-center text-xs text-[#6B726E]">
+        <div className="w-8 h-8 border-2 border-[#101413] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        Verifying product listing from marketplace database...
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="max-w-lg mx-auto py-24 px-4 text-center space-y-4 animate-in fade-in">
+        <div className="w-14 h-14 rounded-full bg-[#F7F5F0] text-[#6B726E] flex items-center justify-center mx-auto">
+          <Package className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-[#101413]">Product Not Available</h2>
+        <p className="text-xs text-[#6B726E] leading-relaxed">
+          {productError || 'This product listing cannot be found, has been removed, or is currently pending administrator moderation.'}
+        </p>
+        <div className="pt-2">
+          <Button variant="primary" size="md" onClick={() => navigateTo('shop')}>
+            Explore Available Marketplace Products
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
@@ -366,10 +458,7 @@ export const ProductDetailPage: React.FC = () => {
         <div className="lg:col-span-7 space-y-4">
           <div className="relative aspect-4/3 sm:aspect-square w-full bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E4E7E5] shadow-2xs group cursor-zoom-in">
             <img
-              src={
-                product.images?.[activeImageIndex] ||
-                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'
-              }
+              src={productGallery[activeImageIndex] || productGallery[0]}
               alt={product.title}
               onClick={() => setIsImageZoomOpen(true)}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -378,6 +467,34 @@ export const ProductDetailPage: React.FC = () => {
               <span className="absolute top-4 left-4 bg-[#101413] text-white text-[11px] font-bold px-2.5 py-1 rounded tracking-wider uppercase">
                 Curated Selection
               </span>
+            )}
+
+            {/* Previous / Next navigation overlay for multi-image products */}
+            {productGallery.length > 1 && (
+              <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 pointer-events-none">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : productGallery.length - 1));
+                  }}
+                  className="p-2 rounded-full bg-white/90 text-[#101413] hover:text-[#0E8F5A] hover:bg-white shadow-md pointer-events-auto transition-all cursor-pointer opacity-90 sm:opacity-0 group-hover:opacity-100"
+                  aria-label="Previous product image"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveImageIndex((prev) => (prev < productGallery.length - 1 ? prev + 1 : 0));
+                  }}
+                  className="p-2 rounded-full bg-white/90 text-[#101413] hover:text-[#0E8F5A] hover:bg-white shadow-md pointer-events-auto transition-all cursor-pointer opacity-90 sm:opacity-0 group-hover:opacity-100"
+                  aria-label="Next product image"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             )}
 
             <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -404,21 +521,33 @@ export const ProductDetailPage: React.FC = () => {
           </div>
 
           {/* Thumbnails */}
-          {product.images && product.images.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
-              {product.images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                    activeImageIndex === idx
-                      ? 'border-[#0E8F5A] ring-2 ring-[#0E8F5A]/20 scale-102'
-                      : 'border-[#E4E7E5] opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
-                </button>
-              ))}
+          {productGallery.length > 1 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-[#6B726E]">
+                <span>Product angles & details ({productGallery.length} photos)</span>
+                <span>Photo {activeImageIndex + 1} of {productGallery.length}</span>
+              </div>
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-2">
+                {productGallery.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`relative w-18 h-18 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                      activeImageIndex === idx
+                        ? 'border-[#0E8F5A] ring-2 ring-[#0E8F5A]/20 scale-102'
+                        : 'border-[#E4E7E5] opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute bottom-1 left-1 bg-[#101413]/90 text-white text-[8px] font-bold px-1 py-0.2 rounded uppercase">
+                        Main
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1550,14 +1679,35 @@ export const ProductDetailPage: React.FC = () => {
           </button>
 
           <div
-            className="max-w-4xl max-h-[90vh] overflow-hidden rounded-xl bg-black flex items-center justify-center"
+            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-xl bg-black flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={product.images?.[activeImageIndex] || product.images?.[0]}
+              src={productGallery[activeImageIndex] || productGallery[0]}
               alt={product.title}
               className="max-w-full max-h-[85vh] object-contain rounded-lg"
             />
+
+            {productGallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : productGallery.length - 1))}
+                  className="absolute left-3 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors cursor-pointer"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev < productGallery.length - 1 ? prev + 1 : 0))}
+                  className="absolute right-3 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/90 transition-colors cursor-pointer"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1575,7 +1725,7 @@ export const ProductDetailPage: React.FC = () => {
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E4E7E5] p-3 sm:hidden shadow-lg animate-in slide-in-from-bottom duration-200">
           <div className="flex items-center gap-3">
             <img
-              src={product.images?.[0]}
+              src={productGallery[0]}
               alt=""
               aria-hidden="true"
               className="w-11 h-11 object-cover rounded bg-[#F7F5F0] border border-[#E4E7E5] shrink-0"

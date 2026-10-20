@@ -44,9 +44,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, className = '
     >
       {/* Product Image Stage */}
       <div className="relative aspect-[4/3] bg-[#F7F5F0] overflow-hidden">
-        {!imageError && product.images?.[0] ? (
+        {!imageError && (product.images?.[0] || product.imageUrl) ? (
           <img
-            src={product.images[0]}
+            src={product.images?.[0] || product.imageUrl}
             alt={product.title}
             referrerPolicy="no-referrer"
             loading="lazy"

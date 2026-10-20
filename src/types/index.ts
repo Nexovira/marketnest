@@ -99,6 +99,7 @@ export interface Product {
   category: CategoryId;
   categoryId?: string;
   images: string[];
+  imageUrl?: string;
   rating: number; // e.g. 4.8
   reviewCount: number;
   inStock: boolean;
@@ -485,6 +486,8 @@ export interface AffiliateApplication {
   submittedAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  reviewReason?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

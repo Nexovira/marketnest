@@ -24,13 +24,14 @@ import {
 export const AdminAffiliateApplicationsPage: React.FC = () => {
   const { requestConfirm, adminProfile, hasPermission, setActiveSection } = useAdmin();
   const [applications, setApplications] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [loading, setLoading] = useState(true);
 
-  const loadApplications = async () => {
+  const loadApplications = async (status = statusFilter) => {
     setLoading(true);
     try {
-      const data = await adminService.getAffiliateApplications();
-      setApplications(data);
+      const data = await adminService.getAffiliateApplications(status === 'all' ? undefined : status);
+      setApplications(data || []);
     } catch (err) {
       console.warn('Error loading affiliate applications:', err);
     } finally {
@@ -39,8 +40,8 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadApplications();
-  }, []);
+    loadApplications(statusFilter);
+  }, [statusFilter]);
 
   const handleReview = (app: any, action: 'approve' | 'reject') => {
     const isApprove = action === 'approve';
@@ -81,16 +82,29 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
             <span>Back to Active Affiliates</span>
           </button>
           <h2 className="text-base font-black text-[#101413] tracking-tight">
-            Pending Affiliate Applications
+            Affiliate Partner Applications
           </h2>
           <p className="text-xs text-[#6B726E]">
-            Verify creator channel authenticity, audience reach, and assign unique tracking codes.
+            Verify creator channel authenticity, audience reach, approve partner codes, or record decline reasons.
           </p>
         </div>
 
-        <span className="text-xs font-bold bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-200 self-start sm:self-auto">
-          {applications.filter((a) => a.status === 'pending').length} Awaiting Verification
-        </span>
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1.5 bg-[#F7F5F0] p-1 rounded-xl border border-[#E4E7E5] self-start sm:self-auto text-xs">
+          {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-lg font-bold capitalize transition-colors cursor-pointer ${
+                statusFilter === s
+                  ? 'bg-white text-[#101413] shadow-xs'
+                  : 'text-[#6B726E] hover:text-[#101413]'
+              }`}
+            >
+              {s === 'all' ? 'All Applications' : s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid */}
@@ -102,13 +116,27 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
       ) : applications.length === 0 ? (
         <div className="bg-white border border-[#E4E7E5] rounded-xl p-12 text-center text-xs text-[#6B726E] space-y-2">
           <UserCheck className="w-8 h-8 text-purple-600 mx-auto" />
-          <p className="font-bold text-sm text-[#101413]">No Pending Applications</p>
-          <p>All affiliate applicants have been processed.</p>
+          <p className="font-bold text-sm text-[#101413]">
+            {statusFilter === 'pending'
+              ? 'No Pending Applications'
+              : statusFilter === 'approved'
+              ? 'No Approved Applications'
+              : statusFilter === 'rejected'
+              ? 'No Declined Applications'
+              : 'No Applications Found'}
+          </p>
+          <p>
+            {statusFilter === 'pending'
+              ? 'All submitted partner applications have been processed.'
+              : 'No applications match this filter status.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {applications.map((app) => {
             const isPending = app.status === 'pending';
+            const isApproved = app.status === 'approved';
+            const isRejected = app.status === 'rejected';
 
             return (
               <div
@@ -119,17 +147,17 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-[#101413]">{app.displayName}</h3>
+                        <h3 className="text-sm font-bold text-[#101413]">{app.displayName || app.fullName}</h3>
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                             isPending
                               ? 'bg-purple-100 text-purple-800'
-                              : app.status === 'approved'
+                              : isApproved
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-rose-100 text-rose-700'
                           }`}
                         >
-                          {app.status.toUpperCase()}
+                          {app.status?.toUpperCase() || 'PENDING'}
                         </span>
                       </div>
                       <p className="text-xs text-[#6B726E] mt-0.5 font-medium">
@@ -138,7 +166,7 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
                     </div>
 
                     <span className="text-[10px] text-[#6B726E] font-mono">
-                      {app.submittedAt ? formatCustomerDate(app.submittedAt) : 'Recently'}
+                      {app.submittedAt || app.createdAt ? formatCustomerDate(app.submittedAt || app.createdAt) : 'Recently'}
                     </span>
                   </div>
 
@@ -184,6 +212,47 @@ export const AdminAffiliateApplicationsPage: React.FC = () => {
                         Application Statement:
                       </span>
                       <p>{app.reason}</p>
+                    </div>
+                  )}
+
+                  {/* Review Audit Info */}
+                  {isApproved && (
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-3 text-xs space-y-1">
+                      <div className="flex items-center justify-between font-bold text-emerald-900 text-[11px]">
+                        <span>Approved & Verified</span>
+                        {app.reviewedAt && (
+                          <span className="font-mono text-[10px] text-emerald-700">
+                            {formatCustomerDate(app.reviewedAt)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-emerald-800 text-[11px]">
+                        Reviewed by: <strong>{app.reviewerName || 'Administrator'}</strong>
+                        {app.assignedCode && (
+                          <span> · Code: <code className="font-bold font-mono">{app.assignedCode}</code></span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {isRejected && (
+                    <div className="bg-rose-50/60 border border-rose-200 rounded-lg p-3 text-xs space-y-1">
+                      <div className="flex items-center justify-between font-bold text-rose-900 text-[11px]">
+                        <span>Declined</span>
+                        {app.reviewedAt && (
+                          <span className="font-mono text-[10px] text-rose-700">
+                            {formatCustomerDate(app.reviewedAt)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-rose-800 text-[11px]">
+                        Reviewed by: <strong>{app.reviewerName || 'Administrator'}</strong>
+                      </p>
+                      {app.reviewReason && (
+                        <p className="text-rose-950 font-medium text-[11px] mt-1 bg-white/70 p-2 rounded border border-rose-100">
+                          Reason: {app.reviewReason}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -175,7 +175,7 @@ export const SellerProductsTab: React.FC = () => {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <img
-                            src={p.images?.[0] || 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=200&q=80'}
+                            src={p.images?.[0] || p.imageUrl || 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=200&q=80'}
                             alt={p.title}
                             className="w-12 h-12 rounded object-cover border border-[#E4E7E5] bg-[#F7F5F0] shrink-0"
                           />
@@ -300,7 +300,7 @@ export const SellerProductsTab: React.FC = () => {
                 <div key={p.id} className="bg-white border border-[#E4E7E5] rounded-xl p-4 space-y-3">
                   <div className="flex items-start gap-3">
                     <img
-                      src={p.images?.[0] || 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=200&q=80'}
+                      src={p.images?.[0] || p.imageUrl || 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=200&q=80'}
                       alt={p.title}
                       className="w-16 h-16 rounded object-cover border border-[#E4E7E5] shrink-0"
                     />

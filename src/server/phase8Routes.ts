@@ -39,9 +39,14 @@ import {
   Conversation,
   ChatMessage
 } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { ensureServerAuth } from './serverAuth';
 
 export const phase8Router = Router();
+
+phase8Router.use(async (_req, _res, next) => {
+  await ensureServerAuth();
+  next();
+});
 
 // ======================================================================
 // 1. PROMOTIONS & SERVER-SIDE COUPON VALIDATION
@@ -375,10 +380,14 @@ phase8Router.post('/reviews/submit', async (req: Request, res: Response) => {
       } catch {}
     }
 
-    // Fallback product info
+    // Database lookup for product seller
     if (!effectiveSellerId) {
-      const prod = MOCK_PRODUCTS.find((p) => p.id === productId);
-      effectiveSellerId = prod?.sellerId || 'seller_1';
+      try {
+        const prodSnap = await getDoc(doc(db, 'products', productId));
+        if (prodSnap.exists()) {
+          effectiveSellerId = prodSnap.data()?.sellerId || '';
+        }
+      } catch {}
     }
 
     const reviewId = `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;

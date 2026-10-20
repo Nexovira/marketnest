@@ -10,7 +10,7 @@ import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../services/currencyService';
 import { Button } from '../components/ui/Button';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { productService } from '../services/productService';
 import { Product } from '../types';
 import {
   ShoppingBag,
@@ -73,10 +73,23 @@ export const CartPage: React.FC = () => {
     }
   }, []);
 
-  // Saved for Later items from wishlist
-  const savedProducts = React.useMemo(() => {
-    if (!wishlistIds || wishlistIds.length === 0) return [];
-    return MOCK_PRODUCTS.filter((p) => wishlistIds.includes(p.id));
+  // Saved for Later items from wishlist (genuine database records)
+  const [savedProducts, setSavedProducts] = React.useState<Product[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    if (!wishlistIds || wishlistIds.length === 0) {
+      setSavedProducts([]);
+      return;
+    }
+    productService.getPublicProducts().then((all) => {
+      if (active) {
+        setSavedProducts(all.filter((p) => wishlistIds.includes(p.id)));
+      }
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [wishlistIds]);
 
   const handleSaveForLater = async (item: (typeof cartItems)[0]) => {

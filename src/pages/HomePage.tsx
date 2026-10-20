@@ -9,14 +9,13 @@ import { useMarket } from '../context/MarketContext';
 import {
   HERO_IMAGE,
   MOCK_CATEGORIES,
-  MOCK_PRODUCTS,
-  MOCK_STORES,
   EDITORIAL_COLLECTIONS
 } from '../data/mockData';
 import { ProductCard } from '../components/ProductCard';
 import { StoreCard } from '../components/StoreCard';
 import { Button } from '../components/ui/Button';
-import { CategoryId, Product } from '../types';
+import { CategoryId, Product, Store as StoreType } from '../types';
+import { productService } from '../services/productService';
 import { recommendationService } from '../services/recommendationService';
 import {
   ShieldCheck,
@@ -39,14 +38,38 @@ export const HomePage: React.FC = () => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [merchantStores, setMerchantStores] = useState<StoreType[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  const trendingProducts = MOCK_PRODUCTS.filter((p) => p.isTrending).slice(0, 8);
-  const featuredStores = MOCK_STORES.slice(0, 4);
-
-  // Load recently viewed products
+  // Load genuine products and stores from database
   useEffect(() => {
-    setRecentlyViewed(recommendationService.getRecentlyViewedProducts(MOCK_PRODUCTS));
+    let active = true;
+    const fetchRealData = async () => {
+      try {
+        const [prods, stores] = await Promise.all([
+          productService.getPublicProducts(),
+          productService.getStores()
+        ]);
+        if (active) {
+          setCatalogProducts(prods);
+          setMerchantStores(stores);
+          setRecentlyViewed(recommendationService.getRecentlyViewedProducts(prods));
+        }
+      } catch (err) {
+        console.warn('Error fetching homepage database records:', err);
+      } finally {
+        if (active) setLoadingData(false);
+      }
+    };
+    fetchRealData();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const trendingProducts = catalogProducts.filter((p) => p.isTrending || p.isEditorialPick || true).slice(0, 8);
+  const featuredStores = merchantStores.slice(0, 4);
 
   const handleClearRecentlyViewed = () => {
     recommendationService.clearRecentlyViewed();
@@ -54,15 +77,15 @@ export const HomePage: React.FC = () => {
     showToast('Browsing History Cleared', 'Your recently viewed products list has been reset.', 'info');
   };
 
-  // Personalized recommendations with transparent explanations
+  // Personalized recommendations with transparent explanations over genuine catalog
   const personalizedList = React.useMemo(() => {
     return recommendationService.getPersonalizedRecommendations({
       viewedIds: recentlyViewed.map((p) => p.id),
       wishlistIds: wishlistIds || [],
-      allProducts: MOCK_PRODUCTS,
+      allProducts: catalogProducts,
       count: 4
     });
-  }, [wishlistIds, recentlyViewed]);
+  }, [wishlistIds, recentlyViewed, catalogProducts]);
 
   const handleCategoryClick = (categoryId: CategoryId) => {
     navigateTo('shop', { category: categoryId });
@@ -346,11 +369,31 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* 4-col desktop / 3-col tablet / 2-col mobile */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-          {trendingProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {loadingData ? (
+          <div className="py-16 text-center text-xs text-[#6B726E]">
+            <div className="w-6 h-6 border-2 border-[#101413] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            Loading curated marketplace discoveries...
+          </div>
+        ) : trendingProducts.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {trendingProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[#F7F5F0]/60 border border-[#E4E7E5] rounded-2xl p-10 text-center space-y-3">
+            <Sparkles className="w-8 h-8 text-[#0E8F5A] mx-auto opacity-70" />
+            <h3 className="font-bold text-base text-[#101413]">Curated Catalog Expanding</h3>
+            <p className="text-xs text-[#6B726E] max-w-md mx-auto">
+              Our marketplace is accepting verified Nigerian artisans and boutique creators. List your handcrafted products today.
+            </p>
+            <div className="pt-2">
+              <Button variant="primary" size="sm" onClick={() => navigateTo('sell')}>
+                List Your Product
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 4B. AI CONCIERGE SPOTLIGHT */}
@@ -558,11 +601,26 @@ export const HomePage: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredStores.map((store) => (
-            <StoreCard key={store.id} store={store} />
-          ))}
-        </div>
+        {featuredStores.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {featuredStores.map((store) => (
+              <StoreCard key={store.id} store={store} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[#F7F5F0]/60 border border-[#E4E7E5] rounded-2xl p-10 text-center space-y-3">
+            <Store className="w-8 h-8 text-[#6B726E] mx-auto opacity-40" />
+            <h3 className="font-bold text-base text-[#101413]">Verified Stores Coming Soon</h3>
+            <p className="text-xs text-[#6B726E] max-w-md mx-auto">
+              Connect with vetted independent Nigerian boutiques and makers.
+            </p>
+            <div className="pt-2">
+              <Button variant="outline" size="sm" onClick={() => navigateTo('sell')}>
+                Apply to Open a Store
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 8. SELLER CALLOUT (Dark Section) */}

@@ -32,7 +32,9 @@ import {
 } from 'lucide-react';
 import { RegionCurrencyModal } from './RegionCurrencyModal';
 import { searchService } from '../services/searchService';
-import { MOCK_PRODUCTS, MOCK_CATEGORIES } from '../data/mockData';
+import { productService } from '../services/productService';
+import { MOCK_CATEGORIES } from '../data/mockData';
+import { Product } from '../types';
 import { formatCurrency } from '../services/currencyService';
 import { History, TrendingUp, ArrowRight } from 'lucide-react';
 
@@ -59,23 +61,32 @@ export const Navbar: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load recent searches
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+
+  // Load recent searches and live catalog for search matching
   useEffect(() => {
     setRecentSearches(searchService.getRecentSearches());
+    let active = true;
+    productService.getPublicProducts().then((list) => {
+      if (active) setAvailableProducts(list);
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // Matching suggestions
+  // Matching suggestions from genuine products
   const matchingProducts = React.useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
-    return MOCK_PRODUCTS.filter(
+    return availableProducts.filter(
       (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
+        (p.title || p.name || '').toLowerCase().includes(q) ||
+        (p.category || '').toLowerCase().includes(q) ||
         p.tags?.some((t) => t.toLowerCase().includes(q)) ||
-        p.seller?.name?.toLowerCase().includes(q)
+        (p.seller?.name || '').toLowerCase().includes(q)
     ).slice(0, 4);
-  }, [searchQuery]);
+  }, [searchQuery, availableProducts]);
 
   const matchingCategories = React.useMemo(() => {
     if (!searchQuery.trim()) return [];

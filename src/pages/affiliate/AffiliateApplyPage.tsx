@@ -10,8 +10,7 @@ import { useMarket } from '../../context/MarketContext';
 import {
   submitAffiliateApplication,
   getAffiliateApplication,
-  getAffiliateProfile,
-  provisionTestAffiliateProfile
+  getAffiliateProfile
 } from '../../services/affiliate/affiliateService';
 import { AffiliateApplication, AffiliateProfile } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -73,6 +72,7 @@ export const AffiliateApplyPage: React.FC = () => {
   // Status & Existing Application State
   const [existingApp, setExistingApp] = useState<AffiliateApplication | null>(null);
   const [existingProfile, setExistingProfile] = useState<AffiliateProfile | null>(null);
+  const [isReapplying, setIsReapplying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -91,6 +91,18 @@ export const AffiliateApplyPage: React.FC = () => {
         ]);
         setExistingApp(app);
         setExistingProfile(prof);
+        if (app && app.status === 'rejected') {
+          // Pre-fill fields for easy revision
+          if (app.fullName) setFullName(app.fullName);
+          if (app.displayName) setDisplayName(app.displayName);
+          if (app.channel) setChannel(app.channel);
+          if (app.channelUrl) setChannelUrl(app.channelUrl);
+          if (app.audience) setAudience(app.audience);
+          if (app.reason) setReason(app.reason);
+          if (app.preferredCategories && app.preferredCategories.length > 0) {
+            setSelectedCategories(app.preferredCategories);
+          }
+        }
       } catch (err) {
         console.warn('Error loading affiliate status:', err);
       } finally {
@@ -139,34 +151,10 @@ export const AffiliateApplyPage: React.FC = () => {
         preferredCategories: selectedCategories
       });
       setExistingApp(app);
+      setIsReapplying(false);
       showToast('Application Submitted', 'Your affiliate application is under review.', 'success');
     } catch (err: any) {
       setErrorMsg(err.message || 'Submission failed. Please check your connection.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Development Quick-Activation for test users
-  const handleInstantTestApproval = async () => {
-    if (!firebaseUser) {
-      showToast('Sign In Required', 'Sign in first to activate test partner mode.', 'info');
-      navigateTo('login', { redirect: 'affiliate-apply' });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const prof = await provisionTestAffiliateProfile(
-        firebaseUser.uid,
-        displayName || fullName || 'Test Creator Partner',
-        displayName ? undefined : undefined
-      );
-      setExistingProfile(prof);
-      showToast('Test Partner Activated', `Active partner profile ready with code: ${prof.code}`, 'success');
-      navigateTo('affiliate-dashboard');
-    } catch (err: any) {
-      showToast('Error', err.message || 'Could not provision test profile.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -205,6 +193,89 @@ export const AffiliateApplyPage: React.FC = () => {
     );
   }
 
+  // Application previously reviewed and rejected
+  if (existingApp && existingApp.status === 'rejected' && !isReapplying) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 space-y-8 animate-in fade-in">
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto ring-8 ring-rose-50/50">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-extrabold text-[#101413]">Application Declined</h2>
+          <p className="text-xs text-[#6B726E] max-w-md mx-auto leading-relaxed">
+            Thank you for your interest in the MarketNest Affiliate Partner Program. After review by our curation team, your application was not approved at this time.
+          </p>
+        </div>
+
+        {/* Reviewer Explanation */}
+        <div className="bg-rose-50/50 border border-rose-200 rounded-2xl p-6 space-y-3 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-rose-900 uppercase tracking-wider text-[10px]">
+              Review Decision & Explanation
+            </span>
+            {existingApp.reviewedAt && (
+              <span className="text-[10px] text-rose-700 font-mono">
+                Reviewed {new Date(existingApp.reviewedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+          <p className="text-rose-950 font-medium leading-relaxed bg-white/80 p-3.5 rounded-xl border border-rose-100">
+            {existingApp.reviewReason || 'No specific explanation was provided. Channels may not meet minimum audience reach or brand safety guidelines.'}
+          </p>
+        </div>
+
+        {/* Previous Submission Summary */}
+        <div className="bg-[#F7F5F0] border border-[#E4E7E5] rounded-2xl p-6 space-y-4 text-xs">
+          <h3 className="font-bold text-[#101413] flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#6B726E]" />
+            <span>Submitted Profile Details</span>
+          </h3>
+
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E4E7E5]">
+            <div>
+              <span className="text-[#6B726E] text-[11px] block">APPLICANT</span>
+              <span className="font-bold text-[#101413]">{existingApp.fullName}</span>
+            </div>
+            <div>
+              <span className="text-[#6B726E] text-[11px] block">PRIMARY CHANNEL</span>
+              <span className="font-bold text-[#101413]">{existingApp.channel}</span>
+            </div>
+            <div className="col-span-2">
+              <span className="text-[#6B726E] text-[11px] block">CHANNEL URL</span>
+              <span className="font-mono text-[11px] text-[#0E8F5A] break-all">{existingApp.channelUrl}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Reapplication Action */}
+        <div className="p-6 bg-white border border-[#E4E7E5] rounded-2xl text-xs space-y-3 shadow-2xs">
+          <h4 className="font-bold text-[#101413] text-sm">Would you like to re-apply?</h4>
+          <p className="text-[#6B726E] text-xs leading-relaxed">
+            You may revise your channel information, update your reach, and submit a new application for evaluation.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsReapplying(true)}
+              className="w-full sm:w-auto"
+            >
+              Update Details & Re-apply
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() => navigateTo('affiliate')}
+              className="w-full sm:w-auto"
+            >
+              Back to Overview
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Application already submitted and pending review
   if (existingApp && existingApp.status === 'pending') {
     return (
@@ -238,26 +309,15 @@ export const AffiliateApplyPage: React.FC = () => {
               <span className="text-[#6B726E] text-[11px] block">CHANNEL URL</span>
               <span className="font-mono text-[11px] text-[#0E8F5A] break-all">{existingApp.channelUrl}</span>
             </div>
+            {existingApp.submittedAt && (
+              <div className="col-span-2">
+                <span className="text-[#6B726E] text-[11px] block">SUBMISSION DATE</span>
+                <span className="font-mono text-[11px] text-[#101413]">
+                  {new Date(existingApp.submittedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Development Helper Action */}
-        <div className="p-4 bg-[#E8F5EF] border border-[#A7E2C9] rounded-2xl text-xs space-y-3">
-          <div className="flex items-center gap-2 text-[#0E8F5A] font-bold">
-            <Sparkles className="w-4 h-4" />
-            <span>Development & Review Testing Mode</span>
-          </div>
-          <p className="text-[#101413] text-[11px] leading-relaxed">
-            During Phase 6 testing, you can instantly activate your test partner profile to examine the live Affiliate Dashboard, link generation, and earnings calculations.
-          </p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleInstantTestApproval}
-            disabled={submitting}
-          >
-            {submitting ? 'Activating Profile...' : 'Activate Test Partner Mode Now'}
-          </Button>
         </div>
 
         <div className="text-center pt-2">
@@ -308,6 +368,25 @@ export const AffiliateApplyPage: React.FC = () => {
         <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Re-application Guidance Banner */}
+      {isReapplying && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Re-applying as Affiliate Partner:</strong> Please revise your promotional channel details and application statement to address the reviewer feedback before submitting.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReapplying(false)}
+            className="text-[11px] font-bold text-amber-800 underline hover:no-underline ml-4 cursor-pointer shrink-0"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
@@ -444,18 +523,6 @@ export const AffiliateApplyPage: React.FC = () => {
             rightIcon={<Send className="w-4 h-4" />}
           >
             {submitting ? 'Submitting Application...' : 'Submit Partner Application'}
-          </Button>
-
-          {/* Instant Test Activation Tool */}
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={handleInstantTestApproval}
-            disabled={submitting}
-            leftIcon={<Sparkles className="w-4 h-4 text-[#0E8F5A]" />}
-          >
-            Instant Test Activation
           </Button>
         </div>
       </form>

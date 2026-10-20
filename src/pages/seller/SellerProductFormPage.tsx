@@ -24,25 +24,12 @@ import {
   Truck
 } from 'lucide-react';
 import { SellerAiAssistantModal } from '../../components/seller/SellerAiAssistantModal';
+import {
+  ProductImageManager,
+  CURATED_STUDIO_SAMPLES
+} from '../../components/seller/ProductImageManager';
 
-const CURATED_SAMPLE_IMAGES = [
-  {
-    name: 'Artisanal Leather',
-    url: '/src/assets/images/editorial_made_in_nigeria_1791134154456.jpg'
-  },
-  {
-    name: 'Lifestyle Loft',
-    url: '/src/assets/images/hero_marketplace_lifestyle_1791134143019.jpg'
-  },
-  {
-    name: 'Tech & Audio',
-    url: '/src/assets/images/editorial_everyday_tech_1791134164769.jpg'
-  },
-  {
-    name: 'Botanical Skincare',
-    url: '/src/assets/images/editorial_beauty_glow_1791134175992.jpg'
-  }
-];
+const CURATED_SAMPLE_IMAGES = CURATED_STUDIO_SAMPLES;
 
 const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: 'fashion', label: 'Fashion & Apparel' },
@@ -90,7 +77,6 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
   const [deliverySpeed, setDeliverySpeed] = useState<'lagos_sameday' | 'lagos_24h' | 'express_48h' | 'standard'>('lagos_24h');
   const [isMadeInNigeria, setIsMadeInNigeria] = useState(true);
   const [images, setImages] = useState<string[]>([CURATED_SAMPLE_IMAGES[0].url]);
-  const [imageUrlInput, setImageUrlInput] = useState('');
   const [specifications, setSpecifications] = useState<ProductSpecification[]>([
     { label: 'Origin', value: 'Handmade in Lagos, Nigeria' },
     { label: 'Material', value: 'Premium Grade Leather' }
@@ -135,7 +121,15 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
       setDescription(existingProduct.description || '');
       setDeliverySpeed(existingProduct.deliverySpeed || 'lagos_24h');
       setIsMadeInNigeria(existingProduct.isMadeInNigeria !== false);
-      setImages(existingProduct.images?.length ? existingProduct.images : [CURATED_SAMPLE_IMAGES[0].url]);
+
+      // Support both multiple images array and legacy single imageUrl
+      const loadedImages = existingProduct.images?.length
+        ? existingProduct.images
+        : (existingProduct as any).imageUrl
+        ? [(existingProduct as any).imageUrl]
+        : [CURATED_SAMPLE_IMAGES[0].url];
+      setImages(loadedImages);
+
       setSpecifications(
         existingProduct.specifications?.length
           ? existingProduct.specifications
@@ -151,21 +145,6 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
     if (mode === 'new') {
       setSlug(slugify(val));
     }
-  };
-
-  const handleAddImage = (urlToAdd: string) => {
-    if (!urlToAdd.trim()) return;
-    if (images.includes(urlToAdd.trim())) return;
-    setImages((prev) => [...prev, urlToAdd.trim()]);
-    setImageUrlInput('');
-  };
-
-  const handleRemoveImage = (index: number) => {
-    if (images.length <= 1) {
-      showToast('Minimum Images', 'At least one product image is required.', 'warning');
-      return;
-    }
-    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleAddSpec = () => {
@@ -195,6 +174,12 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
       return;
     }
 
+    // Published products require at least one photo; draft products can be saved without photos
+    if (status === 'active' && images.length === 0) {
+      showToast('Image Required', 'Please add at least one product photo before publishing to the marketplace.', 'warning');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const parsedTags = tags
@@ -216,6 +201,7 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
         compareAtPrice: originalPrice > 0 ? Number(originalPrice) : undefined,
         category,
         images,
+        imageUrl: images[0] || '', // Maintain backward compatibility for single-image consumers
         rating: existingProduct?.rating || 5.0,
         reviewCount: existingProduct?.reviewCount || 0,
         inStock: stockCount > 0,
@@ -421,75 +407,14 @@ export const SellerProductFormPage: React.FC<SellerProductFormPageProps> = ({ mo
               </div>
             </div>
 
-            {/* 2. Media / Photography */}
-            <div className="bg-white border border-[#E4E7E5] rounded-xl p-6 shadow-xs space-y-4">
-              <h3 className="text-sm font-bold text-[#101413] flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-[#0E8F5A]" />
-                <span>Product Photography</span>
-              </h3>
-
-              {/* Current Images */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {images.map((img, idx) => (
-                  <div key={idx} className="relative group rounded-lg overflow-hidden border border-[#E4E7E5] aspect-square bg-[#F7F5F0]">
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white hover:bg-rose-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                      title="Remove image"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    {idx === 0 && (
-                      <span className="absolute bottom-1 left-1 bg-[#101413] text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
-                        Cover
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Add Custom Image URL */}
-              <div className="flex gap-2 text-xs">
-                <input
-                  type="url"
-                  value={imageUrlInput}
-                  onChange={(e) => setImageUrlInput(e.target.value)}
-                  placeholder="Paste image URL (https://...)"
-                  className="flex-1 bg-[#F7F5F0] border border-[#E4E7E5] rounded-md px-3 py-2 text-xs text-[#101413] focus:outline-none focus:border-[#0E8F5A] focus:bg-white"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAddImage(imageUrlInput)}
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                >
-                  Add Image
-                </Button>
-              </div>
-
-              {/* Quick sample pickers */}
-              <div className="pt-2">
-                <span className="text-[11px] font-semibold text-[#6B726E] block mb-2">
-                  Or pick high-resolution studio photograph:
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {CURATED_SAMPLE_IMAGES.map((sample, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleAddImage(sample.url)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] bg-[#F7F5F0] hover:bg-[#E8F5EF] border border-[#E4E7E5] text-[#101413] cursor-pointer"
-                    >
-                      <img src={sample.url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                      <span>{sample.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            {/* 2. Media / Photography Multi-Image Management */}
+            <ProductImageManager
+              images={images}
+              onChange={setImages}
+              status={status}
+              maxImages={8}
+              disabled={isSubmitting}
+            />
 
             {/* 3. Specifications */}
             <div className="bg-white border border-[#E4E7E5] rounded-xl p-6 shadow-xs space-y-4">
